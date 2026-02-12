@@ -99,6 +99,35 @@
     @apply border-border;
   }
   
+  /* Fix for Brave browser text rendering issues */
+  body, button, input, select, textarea, label {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  
+  /* Fix select element styling in all browsers */
+  select {
+    background-image: linear-gradient(45deg, transparent 50%, white 50%), 
+                      linear-gradient(135deg, white 50%, transparent 50%);
+    background-position: calc(100% - 15px) calc(1em + 2px), 
+                         calc(100% - 10px) calc(1em + 2px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 30px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+  }
+  
+  /* Brave-specific fixes */
+  @supports (-webkit-appearance: none) {
+    select {
+      background-color: currentColor;
+      color: white;
+    }
+  }
+  
   html {
     scroll-behavior: smooth;
   }
@@ -116,6 +145,27 @@
   
   .font-mono {
     font-family: 'IBM Plex Mono', monospace;
+  }
+}
+
+/* Cross-browser compatibility utilities */
+@layer components {
+  /* Input placeholder styling for all browsers */
+  input::placeholder,
+  textarea::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+    opacity: 1;
+  }
+  
+  /* Select option fix for Brave and other browsers */
+  select option {
+    background-color: #374151;
+    color: white;
+  }
+  
+  select option:disabled {
+    background-color: #6b7280;
+    color: #9ca3af;
   }
 }
 

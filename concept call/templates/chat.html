@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Chat Room - {{ username }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <div class="spinner">
+                <i class="fas fa-video fa-spin"></i>
+            </div>
+            <h2>Joining Video Chat...</h2>
+            <p>Setting up your camera and microphone</p>
+            <div class="loading-steps">
+                <div class="step active">
+                    <i class="fas fa-check"></i>
+                    <span>Connected to server</span>
+                </div>
+                <div class="step" id="step-media">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Requesting media access</span>
+                </div>
+                <div class="step" id="step-peers">
+                    <i class="fas fa-spinner"></i>
+                    <span>Connecting to peers</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div class="app-container" style="display: none;">
+        <!-- Top Navigation -->
+        <nav class="top-nav">
+            <div class="nav-left">
+                <div class="logo">
+                    <i class="fas fa-video"></i>
+                    <h1>VideoChat Pro</h1>
+                </div>
+                <div class="room-info">
+                    <span class="room-name">Main Room</span>
+                    <span class="user-count">
+                        <i class="fas fa-users"></i>
+                        <span id="online-count">1</span>
+                    </span>
+                </div>
+            </div>
+            
+            <div class="nav-center">
+                <div class="connection-status">
+                    <div class="status-indicator connected"></div>
+                    <span>Connected</span>
+                </div>
+                <div class="network-info">
+                    <i class="fas fa-wifi"></i>
+                    <span id="peer-count">0 peers</span>
+                </div>
+            </div>
+            
+            <div class="nav-right">
+                <button class="nav-btn" id="fullscreen-btn" title="Fullscreen">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <button class="nav-btn" id="record-btn" title="Record" disabled>
+                    <i class="fas fa-circle"></i>
+                </button>
+                <button class="nav-btn" id="settings-btn" title="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button class="nav-btn btn-danger" id="leave-btn" title="Leave Call">
+                    <i class="fas fa-phone-slash"></i> Leave
+                </button>
+            </div>
+        </nav>
+
+        <div class="main-content">
+            <!-- Left Sidebar - Participants -->
+            <aside class="sidebar participants-sidebar">
+                <div class="sidebar-header">
+                    <h3><i class="fas fa-users"></i> Participants</h3>
+                    <span class="badge" id="participant-count">1</span>
+                </div>
+                
+                <div class="participants-list" id="participants-list">
+                    <!-- Participants will be added here by JavaScript -->
+                    <div class="participant me">
+                        <div class="participant-avatar">
+                            <i class="fas fa-user-circle"></i>
+                            <span class="media-indicator">
+                                <i class="fas fa-video"></i>
+                                <i class="fas fa-microphone"></i>
+                            </span>
+                        </div>
+                        <div class="participant-info">
+                            <span class="participant-name">{{ username }} (You)</span>
+                            <span class="participant-status online">Online</span>
+                        </div>
+                        <div class="participant-actions">
+                            <button class="action-btn" title="Mute">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="sidebar-footer">
+                    <div class="invite-section">
+                        <h4><i class="fas fa-share"></i> Invite Others</h4>
+                        <div class="invite-link">
+                            <input type="text" readonly value="{{ request.url_root }}chat" id="invite-url">
+                            <button class="copy-btn" id="copy-invite">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center - Video Grid -->
+            <main class="video-section">
+                <div class="video-grid" id="video-grid">
+                    <!-- Local video will be inserted here -->
+                    <div class="video-container local-video" id="local-video-container">
+                        <div class="video-placeholder">
+                            <i class="fas fa-user-circle"></i>
+                            <span>Loading your camera...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Video Controls Bar -->
+                <div class="video-controls-bar">
+                    <div class="controls-left">
+                        <button class="control-btn btn-primary" id="toggle-camera">
+                            <i class="fas fa-video"></i>
+                            <span>Camera On</span>
+                        </button>
+                        <button class="control-btn btn-primary" id="toggle-microphone">
+                            <i class="fas fa-microphone"></i>
+                            <span>Mic On</span>
+                        </button>
+                        <button class="control-btn" id="toggle-screenshare">
+                            <i class="fas fa-desktop"></i>
+                            <span>Share Screen</span>
+                        </button>
+                    </div>
+                    
+                    <div class="controls-center">
+                        <button class="control-btn" id="toggle-chat">
+                            <i class="fas fa-comments"></i>
+                            <span>Chat</span>
+                        </button>
+                        <button class="control-btn" id="toggle-participants">
+                            <i class="fas fa-users"></i>
+                            <span>Participants</span>
+                        </button>
+                    </div>
+                    
+                    <div class="controls-right">
+                        <button class="control-btn btn-danger" id="end-call">
+                            <i class="fas fa-phone-slash"></i>
+                            <span>End Call</span>
+                        </button>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Sidebar - Chat -->
+            <aside class="sidebar chat-sidebar" id="chat-sidebar">
+                <div class="sidebar-header">
+                    <h3><i class="fas fa-comments"></i> Chat</h3>
+                    <button class="sidebar-close" id="close-chat">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="chat-messages" id="chat-messages">
+                    <div class="welcome-message">
+                        <i class="fas fa-rocket"></i>
+                        <h4>Welcome to the chat, {{ username }}!</h4>
+                        <p>Start chatting with other participants. Your messages are end-to-end encrypted.</p>
+                    </div>
+                </div>
+                
+                <div class="chat-input-area">
+                    <div class="typing-indicator" id="typing-indicator" style="display: none;">
+                        <i class="fas fa-pencil-alt"></i>
+                        <span id="typing-text">Someone is typing...</span>
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <input 
+                            type="text" 
+                            id="message-input" 
+                            placeholder="Type a message..."
+                            maxlength="1000"
+                        >
+                        <button class="send-btn" id="send-message">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="input-actions">
+                        <button class="action-btn" title="Emoji">
+                            <i class="fas fa-smile"></i>
+                        </button>
+                        <button class="action-btn" title="Attach File">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <button class="action-btn" title="Format">
+                            <i class="fas fa-font"></i>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal">
+            <div class="modal-content settings-modal">
+                <div class="modal-header">
+                    <h3><i class="fas fa-cog"></i> Settings</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-tabs">
+                        <button class="tab-btn active" data-tab="audio">Audio</button>
+                        <button class="tab-btn" data-tab="video">Video</button>
+                        <button class="tab-btn" data-tab="network">Network</button>
+                        <button class="tab-btn" data-tab="advanced">Advanced</button>
+                    </div>
+                    
+                    <div class="settings-content">
+                        <div class="tab-pane active" id="audio-settings">
+                            <h4><i class="fas fa-microphone"></i> Audio Settings</h4>
+                            <div class="setting-group">
+                                <label>Microphone</label>
+                                <select id="audio-input" class="select-control">
+                                    <option value="">Select microphone...</option>
+                                </select>
+                            </div>
+                            <div class="setting-group">
+                                <label>Speaker</label>
+                                <select id="audio-output" class="select-control">
+                                    <option value="">Select speaker...</option>
+                                </select>
+                            </div>
+                            <div class="setting-group">
+                                <label>Volume</label>
+                                <input type="range" id="volume-slider" min="0" max="100" value="100">
+                                <span id="volume-value">100%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="tab-pane" id="video-settings">
+                            <h4><i class="fas fa-video"></i> Video Settings</h4>
+                            <div class="setting-group">
+                                <label>Camera</label>
+                                <select id="video-input" class="select-control">
+                                    <option value="">Select camera...</option>
+                                </select>
+                            </div>
+                            <div class="setting-group">
+                                <label>Resolution</label>
+                                <select id="video-resolution" class="select-control">
+                                    <option value="hd">HD (720p)</option>
+                                    <option value="full-hd" selected>Full HD (1080p)</option>
+                                    <option value="auto">Auto</option>
+                                </select>
+                            </div>
+                            <div class="setting-group">
+                                <label>Frame Rate</label>
+                                <select id="video-framerate" class="select-control">
+                                    <option value="30">30 FPS</option>
+                                    <option value="24">24 FPS</option>
+                                    <option value="15">15 FPS</option>
+                                </select>
+                            </div>
+                            <div class="video-preview">
+                                <video id="settings-preview" autoplay playsinline muted></video>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancel-settings">Cancel</button>
+                    <button class="btn btn-primary" id="save-settings">Save Changes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications Container -->
+        <div id="notifications-container"></div>
+    </div>
+
+    <!-- WebRTC Configuration -->
+    <script>
+        // Configuration passed from server
+        const APP_CONFIG = {
+            username: "{{ username }}",
+            userId: "{{ user_id }}",
+            serverTime: "{{ server_time }}",
+            publicUrl: "{{ public_url | default('') }}",
+            localIp: "{{ local_ip | default('') }}",
+            publicIp: "{{ public_ip | default('') }}",
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' },
+                {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                }
+            ],
+            sdpSemantics: 'unified-plan',
+            bundlePolicy: 'max-bundle',
+            rtcpMuxPolicy: 'require'
+        };
+    </script>
+
+    <!-- Load JavaScript Files -->
+    <script src="{{ url_for('static', filename='webrtc.js') }}"></script>
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>

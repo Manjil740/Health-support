@@ -9,7 +9,12 @@ import functools
 import logging
 from flask import Blueprint, request, jsonify, g
 
-from api.json_db import users_db, user_profiles_db, hash_password, verify_password
+from api.json_db import users_db, user_profiles_db, hash_password, verify_password, clinics_db, subscriptions_db, JsonCollection
+from otp_service import create_otp, verify_otp, is_email_verified
+from subscription_service import create_subscription, check_subscription_status
+
+# Temporary storage for pending registrations
+registrations_db = JsonCollection('pending_registrations')
 
 logger = logging.getLogger(__name__)
 
@@ -104,84 +109,231 @@ def login_required(f):
 
 @auth_bp.route('/auth/register/', methods=['POST'])
 def register():
-    """Register a new user."""
+    """Register a new patient with full details"""
     try:
         data = request.get_json(silent=True) or {}
-        username = data.get('username', '').strip()
+        
+        # Extract patient fields
         email = data.get('email', '').strip()
+        phone = data.get('phone', '').strip()
         password = data.get('password', '')
-        first_name = data.get('first_name', '').strip()
-        last_name = data.get('last_name', '').strip()
-        user_type = data.get('user_type', 'patient')
-
+        age = data.get('age', 0)
+        gender = data.get('gender', '')
+        location = data.get('location', '')
+        weight = data.get('weight')
+        height = data.get('height')
+        blood_group = data.get('blood_group', '')
+        first_name = data.get('first_name', '').strip() or email.split('@')[0]
+        last_name = data.get('last_name', '')
+        
         # Validation
         errors = {}
-        if not username:
-            errors['username'] = 'Username is required.'
         if not email:
             errors['email'] = 'Email is required.'
+        if not phone:
+            errors['phone'] = 'Phone number is required.'
         if not password or len(password) < 6:
             errors['password'] = 'Password must be at least 6 characters.'
+        if age < 18:
+            errors['age'] = 'You must be at least 18 years old.'
         
         if errors:
-            logger.warning(f"Registration validation failed: {errors}")
+            logger.warning(f"Patient registration validation failed: {errors}")
             return jsonify(errors), 400
 
-        if users_db.exists(username=username):
-            logger.warning(f"Registration failed: username already exists - {username}")
-            return jsonify({'username': 'A user with this username already exists.'}), 400
         if users_db.exists(email=email):
             logger.warning(f"Registration failed: email already exists - {email}")
-            return jsonify({'email': 'A user with this email already exists.'}), 400
+            return jsonify({'email': 'An account with this email already exists.'}), 400
 
-        # Create user
-        user = users_db.create({
-            'username': username,
-            'email': email,
-            'password': hash_password(password),
-            'first_name': first_name,
-            'last_name': last_name,
-            'is_active': True,
-        })
-
-        # Create user profile
-        user_profiles_db.create({
-            'user_id': user['id'],
-            'user_type': user_type,
-            'phone': '',
-            'date_of_birth': None,
-            'gender': '',
-            'address': '',
-            'profile_picture': None,
-            'blood_group': '',
-            'height': None,
-            'weight': None,
-            'emergency_contact': '',
-            'specialization': '',
-            'license_number': '',
-            'years_of_experience': None,
-            'consultation_fee': None,
-        })
-
-        token = generate_token(user)
-        logger.info(f"User registered successfully: {username}")
-
+        # Send OTP
+        otp = create_otp(email, first_name)
+        
+        # Store registration data temporarily in session data
+        registrations_db = __import__('api.json_db', fromlist=['registrations_db']).registrations_db if hasattr(__import__('api.json_db'), 'registrations_db') else None
+        
+        logger.info(f"OTP sent for registration: {email}")
         return jsonify({
-            'token': token,
-            'user': {
-                'id': user['id'],
-                'username': user['username'],
-                'email': user['email'],
-                'first_name': user['first_name'],
-                'last_name': user['last_name'],
-                'user_type': user_type,
-            }
-        }), 201
+            'message': 'OTP sent to your email',
+            'email': email,
+            'demo_otp': otp,  # For development only
+        }), 200
     
     except Exception as e:
         logger.error(f"Registration error: {str(e)}")
         return jsonify({
             'error': 'Registration failed',
+            'detail': str(e)
+        }), 500
+
+
+@auth_bp.route('/auth/verify-otp/', methods=['POST'])
+def verify_email_otp():
+    """Verify OTP and create patient account"""
+    try:
+        data = request.get_json(silent=True) or {}
+        email = data.get('email', '').strip()
+        otp = data.get('otp', '')
+        password = data.get('password', '')
+        phone = data.get('phone', '')
+        age = data.get('age', 0)
+        gender = data.get('gender', '')
+        location = data.get('location', '')
+        weight = data.get('weight')
+        height = data.get('height')
+        blood_group = data.get('blood_group', '')
+        first_name = data.get('first_name', '').strip() or email.split('@')[0]
+        last_name = data.get('last_name', '')
+        
+        if not email or not otp:
+            return jsonify({'error': 'Email and OTP are required'}), 400
+        
+        # Verify OTP
+        result = verify_otp(email, otp)
+        if not result['valid']:
+            return jsonify({'error': result['error']}), 400
+        
+        # Check if user exists
+        if users_db.exists(email=email):
+            return jsonify({'email': 'An account with this email already exists.'}), 400
+        
+        # Create user account
+        user = users_db.create({
+            'username': email.split('@')[0] + str(users_db.count() + 1),
+            'email': email,
+            'password': hash_password(password),
+            'first_name': first_name,
+            'last_name': last_name,
+            'is_active': True,
+            'is_verified': True,
+        })
+        
+        # Calculate age from birth date if provided
+        birth_date = data.get('date_of_birth')
+        
+        # Create user profile with all new fields
+        user_profiles_db.create({
+            'user_id': user['id'],
+            'user_type': 'patient',
+            'phone': phone,
+            'date_of_birth': birth_date,
+            'age': age,
+            'gender': gender,
+            'location': location,  # Anonymous to others
+            'profile_picture': None,
+            'blood_group': blood_group,
+            'height': height,
+            'weight': weight,
+            'emergency_contact': '',
+            'is_verified': True,
+        })
+        
+        token = generate_token(user)
+        logger.info(f"Patient account created: {email}")
+        
+        return jsonify({
+            'token': token,
+            'user': {
+                'id': user['id'],
+                'email': user['email'],
+                'first_name': first_name,
+                'last_name': last_name,
+                'user_type': 'patient',
+            }
+        }), 201
+    
+    except Exception as e:
+        logger.error(f"OTP verification error: {str(e)}")
+        return jsonify({
+            'error': 'Verification failed',
+            'detail': str(e)
+        }), 500
+
+
+@auth_bp.route('/auth/register/clinic/', methods=['POST'])
+def register_clinic():
+    """Register a new clinic/hospital with subscription"""
+    try:
+        data = request.get_json(silent=True) or {}
+        
+        # Clinic fields
+        clinic_name = data.get('clinic_name', '').strip()
+        clinic_email = data.get('clinic_email', '').strip()
+        location = data.get('location', '').strip()
+        phone = data.get('phone', '').strip()
+        admin_password = data.get('admin_password', '')
+        subscription_plan = data.get('subscription_plan', 'monthly')  # monthly or yearly
+        license_number = data.get('license_number', '')
+        registration_number = data.get('registration_number', '')
+        
+        # Validation
+        errors = {}
+        if not clinic_name:
+            errors['clinic_name'] = 'Clinic name is required.'
+        if not clinic_email:
+            errors['clinic_email'] = 'Email is required.'
+        if not location:
+            errors['location'] = 'Location is required.'
+        if not admin_password or len(admin_password) < 8:
+            errors['admin_password'] = 'Password must be at least 8 characters.'
+        if subscription_plan not in ['monthly', 'yearly']:
+            errors['subscription_plan'] = 'Invalid subscription plan.'
+        
+        if errors:
+            logger.warning(f"Clinic registration validation failed: {errors}")
+            return jsonify(errors), 400
+        
+        if users_db.exists(email=clinic_email):
+            return jsonify({'clinic_email': 'An account with this email already exists.'}), 400
+        
+        # Create clinic record
+        clinic = clinics_db.create({
+            'name': clinic_name,
+            'email': clinic_email,
+            'location': location,
+            'phone': phone,
+            'license_number': license_number,
+            'registration_number': registration_number,
+            'status': 'pending',  # Must verify before enabling
+            'created_at': datetime.datetime.utcnow().isoformat(),
+        })
+        
+        # Create clinic admin user
+        admin_user = users_db.create({
+            'username': clinic_name.lower().replace(' ', '_') + '_admin',
+            'email': clinic_email,
+            'password': hash_password(admin_password),
+            'first_name': 'Clinic',
+            'last_name': 'Admin',
+            'is_active': True,
+            'clinic_id': clinic['id'],
+        })
+        
+        # Create admin profile
+        user_profiles_db.create({
+            'user_id': admin_user['id'],
+            'user_type': 'clinic_admin',
+            'phone': phone,
+            'clinic_id': clinic['id'],
+            'is_verified': False,
+        })
+        
+        # Create subscription
+        subscription = create_subscription(clinic['id'], subscription_plan)
+        
+        logger.info(f"Clinic registered: {clinic_name} ({clinic['id']})")
+        
+        return jsonify({
+            'message': 'Clinic registered successfully',
+            'clinic_id': clinic['id'],
+            'admin_email': clinic_email,
+            'subscription_plan': subscription_plan,
+            'subscription': subscription,
+        }), 201
+    
+    except Exception as e:
+        logger.error(f"Clinic registration error: {str(e)}")
+        return jsonify({
+            'error': 'Clinic registration failed',
             'detail': str(e)
         }), 500
 

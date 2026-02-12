@@ -100,7 +100,7 @@ const aiInsights = [
 ];
 
 export function PatientDashboard() {
-  const { user } = useApp();
+  const { user, setCurrentView } = useApp();
   const [greeting, setGreeting] = useState('Good morning');
 
   useEffect(() => {
@@ -131,16 +131,16 @@ export function PatientDashboard() {
             <Button 
               variant="destructive" 
               className="rounded-xl"
-              onClick={() => window.location.href = '/emergency'}
+              onClick={() => setCurrentView('emergency')}
             >
               <AlertTriangle className="w-4 h-4 mr-2" />
               Emergency
             </Button>
-            <Button variant="outline" className="rounded-xl">
+            <Button variant="outline" className="rounded-xl" onClick={() => setCurrentView('video-call')}>
               <Video className="w-4 h-4 mr-2" />
               Video Call
             </Button>
-            <Button className="hg-btn-primary">
+            <Button className="hg-btn-primary" onClick={() => setCurrentView('ai-insights')}>
               <Sparkles className="w-4 h-4 mr-2" />
               AI Triage
             </Button>
@@ -427,27 +427,27 @@ export function PatientDashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" className="flex-col h-auto py-4 rounded-xl" onClick={() => window.location.href = '/diagnosis-history'}>
+                <Button variant="outline" className="flex-col h-auto py-4 rounded-xl" onClick={() => setCurrentView('diagnosis-history')}>
                   <History className="w-5 h-5 mb-2" />
                   <span className="text-xs">History</span>
                 </Button>
-                <Button variant="outline" className="flex-col h-auto py-4 rounded-xl" onClick={() => window.location.href = '/ai-insights'}>
+                <Button variant="outline" className="flex-col h-auto py-4 rounded-xl" onClick={() => setCurrentView('ai-insights')}>
                   <Brain className="w-5 h-5 mb-2" />
                   <span className="text-xs">AI Insights</span>
                 </Button>
-                <Button variant="outline" className="flex-col h-auto py-4 rounded-xl" onClick={() => window.location.href = '/nutrition'}>
+                <Button variant="outline" className="flex-col h-auto py-4 rounded-xl" onClick={() => setCurrentView('nutrition')}>
                   <Apple className="w-5 h-5 mb-2" />
                   <span className="text-xs">Nutrition</span>
                 </Button>
-                <Button variant="outline" className="flex-col h-auto py-4 rounded-xl" onClick={() => window.location.href = '/diet-plans'}>
+                <Button variant="outline" className="flex-col h-auto py-4 rounded-xl" onClick={() => setCurrentView('diet-plans')}>
                   <Utensils className="w-5 h-5 mb-2" />
                   <span className="text-xs">Diet Plans</span>
                 </Button>
-                <Button variant="outline" className="flex-col h-auto py-4 rounded-xl" onClick={() => window.location.href = '/medicine-reminders'}>
+                <Button variant="outline" className="flex-col h-auto py-4 rounded-xl" onClick={() => setCurrentView('medicine-reminders')}>
                   <Pill className="w-5 h-5 mb-2" />
                   <span className="text-xs">Meds</span>
                 </Button>
-                <Button variant="outline" className="flex-col h-auto py-4 rounded-xl" onClick={() => window.location.href = '/doctor-reviews'}>
+                <Button variant="outline" className="flex-col h-auto py-4 rounded-xl" onClick={() => setCurrentView('doctor-reviews')}>
                   <Sparkles className="w-5 h-5 mb-2" />
                   <span className="text-xs">Reviews</span>
                 </Button>

@@ -18,8 +18,10 @@ import {
   Hand,
   Send,
   ChevronLeft,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getVideoServerUrl } from '@/lib/config';
 
 const upcomingAppointments = [
   { id: 1, doctor: 'Dr. Sarah Johnson', specialty: 'Cardiologist', time: '10:00 AM', duration: '30 min', status: 'ready' },

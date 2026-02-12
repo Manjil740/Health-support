@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { AuthScreen } from './sections/AuthScreen';
+import { AuthScreen } from './sections/AuthScreenNew';
 import { LandingPage } from './sections/LandingPage';
 import { PatientDashboard } from './sections/PatientDashboard';
 import { DoctorDashboard } from './sections/DoctorDashboard';

@@ -615,3 +615,80 @@ def health_education():
         return jsonify({'error': 'Topic is required'}), 400
     result = gemini_service.get_health_education(topic)
     return jsonify(result)
+
+# ── Messages / Chat ──────────────────────────────
+
+# Create a simple in-memory message store (in production, use a database)
+_messages_store = {}
+
+@views_bp.route('/messages/', methods=['GET', 'POST'])
+@login_required
+def messages():
+    """Get messages for the current user or send a message"""
+    uid = g.user.id
+    
+    if request.method == 'GET':
+        # Get all messages for this user
+        recipient_id = request.args.get('recipient_id')
+        if recipient_id:
+            key = f"{min(uid, int(recipient_id))}_{max(uid, int(recipient_id))}"
+        else:
+            key = str(uid)
+        
+        msgs = _messages_store.get(key, [])
+        return jsonify(msgs), 200
+    
+    # POST - Send a message
+    data = request.get_json(silent=True) or {}
+    recipient_id = data.get('recipient_id')
+    text = data.get('text', '')
+    
+    if not recipient_id or not text:
+        return jsonify({'error': 'recipient_id and text are required'}), 400
+    
+    key = f"{min(uid, int(recipient_id))}_{max(uid, int(recipient_id))}"
+    if key not in _messages_store:
+        _messages_store[key] = []
+    
+    message = {
+        'id': len(_messages_store[key]) + 1,
+        'sender': uid,
+        'recipient': int(recipient_id),
+        'text': text,
+        'timestamp': datetime.utcnow().isoformat(),
+        'read': False,
+    }
+    
+    _messages_store[key].append(message)
+    return jsonify(message), 201
+
+
+@views_bp.route('/messages/<int:message_id>/', methods=['PATCH'])
+@login_required
+def mark_message_read(message_id):
+    """Mark a message as read"""
+    data = request.get_json(silent=True) or {}
+    read_status = data.get('read', True)
+    
+    # In a real app, update the message in the database
+    return jsonify({'id': message_id, 'read': read_status}), 200
+
+
+@views_bp.route('/appointments/<int:apt_id>/start-video/', methods=['POST'])
+@login_required
+def start_video_call(apt_id):
+    """Initiate a video call for an appointment"""
+    apt = appointments_db.get(apt_id)
+    if not apt:
+        return jsonify({'error': 'Appointment not found'}), 404
+    
+    # Generate a unique room ID for this call
+    import uuid
+    room_id = f"apt_{apt_id}_{uuid.uuid4().hex[:8]}"
+    
+    return jsonify({
+        'room_id': room_id,
+        'appointment_id': apt_id,
+        'video_server': request.host.split(':')[0] + ':5000',  # Video server URL
+        'message': 'Video call started',
+    }), 200

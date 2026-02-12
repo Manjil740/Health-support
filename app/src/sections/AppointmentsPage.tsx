@@ -8,11 +8,11 @@ import {
     Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from '@/components/ui/card';
 import {
-    Calendar, Clock, Plus, Trash2, Edit, CheckCircle2, XCircle, Loader2, AlertCircle, User,
+    Calendar, Clock, Plus, Trash2, Edit, CheckCircle2, XCircle, Loader2, AlertCircle, User, Video,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-    apiGetAppointments, apiCreateAppointment, apiUpdateAppointment, apiDeleteAppointment,
+    apiGetAppointments, apiCreateAppointment, apiUpdateAppointment, apiDeleteAppointment, apiStartVideoCall,
 } from '@/lib/api';
 
 interface Appointment {
@@ -100,6 +100,18 @@ export function AppointmentsPage() {
         catch (err: any) { toast.error('Failed', { description: err.message }); }
     };
 
+    const handleStartVideoCall = async (id: number) => {
+        try {
+            const response = await apiStartVideoCall(id);
+            toast.success('Starting video call...');
+            // In a real implementation, this would navigate to a video call page
+            // For now, we'll open the video call section
+            window.location.hash = '#video-call';
+        } catch (err: any) {
+            toast.error('Failed to start video call', { description: err.message });
+        }
+    };
+
     const startEdit = (a: Appointment) => {
         setEditId(a.id); setReason(a.reason || ''); setAppointmentDate(a.appointment_date?.slice(0, 16) || '');
         setDuration(String(a.duration || 30)); setNotes(a.notes || ''); setShowForm(true);
@@ -179,6 +191,7 @@ export function AppointmentsPage() {
                                         {a.notes && <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {a.notes}</p>}
                                     </div>
                                     <div className="flex items-center gap-1 flex-shrink-0">
+                                        {a.status === 'confirmed' && <Button variant="outline" size="sm" className="gap-1" onClick={() => handleStartVideoCall(a.id)}><Video className="w-4 h-4" /> Video Call</Button>}
                                         {a.status === 'scheduled' && <Button variant="ghost" size="icon" className="text-green-600" onClick={() => handleStatusChange(a.id, 'confirmed')}><CheckCircle2 className="w-4 h-4" /></Button>}
                                         <Button variant="ghost" size="icon" onClick={() => startEdit(a)}><Edit className="w-4 h-4" /></Button>
                                         {a.status !== 'cancelled' && <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleStatusChange(a.id, 'cancelled')}><XCircle className="w-4 h-4" /></Button>}

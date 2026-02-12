@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Chat - Join Room</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-header">
+            <div class="logo">
+                <i class="fas fa-video"></i>
+                <h1>VideoChat Pro</h1>
+            </div>
+            <p class="subtitle">High-quality video conferencing in your browser</p>
+        </div>
+
+        <div class="login-card">
+            <h2><i class="fas fa-sign-in-alt"></i> Join Video Chat</h2>
+            
+            <div class="browser-check">
+                <div class="check-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span>WebRTC Support: <span id="webrtc-check">Checking...</span></span>
+                </div>
+                <div class="check-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Media Devices: <span id="media-check">Checking...</span></span>
+                </div>
+                <div class="check-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span>WebSocket: <span id="ws-check">Checking...</span></span>
+                </div>
+            </div>
+
+            <form id="login-form" class="login-form">
+                <div class="form-group">
+                    <label for="username">
+                        <i class="fas fa-user"></i> Your Name
+                    </label>
+                    <input 
+                        type="text" 
+                        id="username" 
+                        name="username" 
+                        placeholder="Enter your display name" 
+                        required
+                        minlength="2"
+                        maxlength="20"
+                        autocomplete="off"
+                        autofocus
+                    >
+                    <small>This will be visible to other participants</small>
+                </div>
+
+                <div class="media-permission-note">
+                    <i class="fas fa-info-circle"></i>
+                    <p>After joining, you'll be asked to allow camera and microphone access for video calling.</p>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-lg" id="join-btn">
+                        <i class="fas fa-video"></i> Join Video Chat
+                    </button>
+                    
+                    <div class="test-links">
+                        <a href="#" id="test-camera">
+                            <i class="fas fa-camera"></i> Test Camera
+                        </a>
+                        <a href="#" id="test-microphone">
+                            <i class="fas fa-microphone"></i> Test Microphone
+                        </a>
+                    </div>
+                </div>
+            </form>
+
+            <div class="browser-support">
+                <h4><i class="fas fa-desktop"></i> Recommended Browsers</h4>
+                <div class="browser-icons">
+                    <div class="browser">
+                        <i class="fab fa-chrome"></i>
+                        <span>Chrome 60+</span>
+                    </div>
+                    <div class="browser">
+                        <i class="fab fa-firefox"></i>
+                        <span>Firefox 55+</span>
+                    </div>
+                    <div class="browser">
+                        <i class="fab fa-safari"></i>
+                        <span>Safari 11+</span>
+                    </div>
+                    <div class="browser">
+                        <i class="fab fa-edge"></i>
+                        <span>Edge 79+</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="disclaimer">
+                <i class="fas fa-shield-alt"></i>
+                <p>Your video calls are peer-to-peer and encrypted. No video data is stored on our servers.</p>
+            </div>
+        </div>
+
+        <div class="login-footer">
+            <p>VideoChat Pro &copy; 2024 | <a href="#" id="privacy-link">Privacy Policy</a> | <a href="#" id="tos-link">Terms of Service</a></p>
+            <p class="server-status">
+                <i class="fas fa-server"></i>
+                <span id="server-status">Server: Checking...</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Camera Test Modal -->
+    <div id="camera-test-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-camera"></i> Camera Test</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="video-container">
+                    <video id="test-video" autoplay playsinline></video>
+                </div>
+                <div class="video-controls">
+                    <select id="camera-select" class="select-control">
+                        <option value="">Select Camera...</option>
+                    </select>
+                    <button id="start-camera-test" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Start Test
+                    </button>
+                    <button id="stop-camera-test" class="btn btn-secondary" disabled>
+                        <i class="fas fa-stop"></i> Stop Test
+                    </button>
+                </div>
+                <div id="camera-status" class="status-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Server info exposed to client
+        window.SERVER_INFO = {
+            public_url: "{{ public_url | default('') }}",
+            local_ip: "{{ local_ip | default('') }}",
+            public_ip: "{{ public_ip | default('') }}"
+        };
+
+        // Browser compatibility check
+        function checkBrowserCompatibility() {
+            const webrtcCheck = document.getElementById('webrtc-check');
+            const mediaCheck = document.getElementById('media-check');
+            const wsCheck = document.getElementById('ws-check');
+            
+            // Check WebRTC
+            if (window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection) {
+                webrtcCheck.textContent = 'Supported';
+                webrtcCheck.className = 'supported';
+            } else {
+                webrtcCheck.textContent = 'Not Supported';
+                webrtcCheck.className = 'unsupported';
+            }
+            
+            // Check Media Devices
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                mediaCheck.textContent = 'Available';
+                mediaCheck.className = 'supported';
+            } else {
+                mediaCheck.textContent = 'Not Available';
+                mediaCheck.className = 'unsupported';
+            }
+            
+            // Check WebSocket
+            if (window.WebSocket) {
+                wsCheck.textContent = 'Available';
+                wsCheck.className = 'supported';
+            } else {
+                wsCheck.textContent = 'Not Available';
+                wsCheck.className = 'unsupported';
+            }
+        }
+        
+        // Test server connection
+        async function checkServerStatus() {
+            const statusEl = document.getElementById('server-status');
+            try {
+                const response = await fetch('/health');
+                if (response.ok) {
+                    statusEl.textContent = 'Server: Online';
+                    statusEl.className = 'online';
+                } else {
+                    statusEl.textContent = 'Server: Error';
+                    statusEl.className = 'error';
+                }
+            } catch (error) {
+                statusEl.textContent = 'Server: Offline';
+                statusEl.className = 'offline';
+            }
+        }
+        
+        // Camera test functionality
+        let testStream = null;
+        
+        async function startCameraTest() {
+            const video = document.getElementById('test-video');
+            const status = document.getElementById('camera-status');
+            const startBtn = document.getElementById('start-camera-test');
+            const stopBtn = document.getElementById('stop-camera-test');
+            
+            try {
+                // Get available cameras
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                const select = document.getElementById('camera-select');
+                select.innerHTML = '<option value="">Select Camera...</option>';
+                
+                videoDevices.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.textContent = device.label || `Camera ${select.options.length}`;
+                    select.appendChild(option);
+                });
+                
+                // Start with default camera
+                testStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                });
+                
+                video.srcObject = testStream;
+                status.textContent = '✅ Camera working correctly';
+                status.className = 'success';
+                
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                
+                // Handle camera selection change
+                select.addEventListener('change', async () => {
+                    if (testStream) {
+                        testStream.getTracks().forEach(track => track.stop());
+                    }
+                    
+                    const constraints = {
+                        video: {
+                            deviceId: select.value ? { exact: select.value } : undefined,
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        },
+                        audio: false
+                    };
+                    
+                    testStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    video.srcObject = testStream;
+                });
+                
+            } catch (error) {
+                status.textContent = `❌ Camera error: ${error.message}`;
+                status.className = 'error';
+            }
+        }
+        
+        function stopCameraTest() {
+            if (testStream) {
+                testStream.getTracks().forEach(track => track.stop());
+                testStream = null;
+            }
+            
+            const video = document.getElementById('test-video');
+            video.srcObject = null;
+            
+            document.getElementById('start-camera-test').disabled = false;
+            document.getElementById('stop-camera-test').disabled = true;
+            document.getElementById('camera-status').textContent = 'Camera test stopped';
+        }
+        
+        // Handle login form
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const joinBtn = document.getElementById('join-btn');
+            
+            if (!username) {
+                alert('Please enter your name');
+                return;
+            }
+            
+            joinBtn.disabled = true;
+            joinBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Joining...';
+            
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `username=${encodeURIComponent(username)}`
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Redirect to chat page
+                    window.location.href = '/chat';
+                } else {
+                    alert(data.error || 'Login failed');
+                    joinBtn.disabled = false;
+                    joinBtn.innerHTML = '<i class="fas fa-video"></i> Join Video Chat';
+                }
+            } catch (error) {
+                alert('Connection error. Please try again.');
+                joinBtn.disabled = false;
+                joinBtn.innerHTML = '<i class="fas fa-video"></i> Join Video Chat';
+            }
+        });
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkBrowserCompatibility();
+            checkServerStatus();
+            
+            // Set up camera test modal
+            const testCameraBtn = document.getElementById('test-camera');
+            const modal = document.getElementById('camera-test-modal');
+            const closeBtn = modal.querySelector('.modal-close');
+            
+            testCameraBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                modal.style.display = 'block';
+                startCameraTest();
+            });
+            
+            closeBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+                stopCameraTest();
+            });
+            
+            window.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                    stopCameraTest();
+                }
+            });
+            
+            // Test microphone
+            document.getElementById('test-microphone').addEventListener('click', async (e) => {
+                e.preventDefault();
+                
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream.getTracks().forEach(track => track.stop());
+                    alert('✅ Microphone working correctly');
+                } catch (error) {
+                    alert(`❌ Microphone error: ${error.message}`);
+                }
+            });
+            
+            // Check server status every 30 seconds
+            setInterval(checkServerStatus, 30000);
+        });
+    </script>
+</body>
+</html>
