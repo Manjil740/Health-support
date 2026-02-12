@@ -1,0 +1,313 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* HealthGuard AI - Light Theme (Default) */
+    --background: 210 20% 98%;
+    --foreground: 210 45% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 210 45% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 45% 11%;
+    --primary: 220 100% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 210 45% 11%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 20% 46%;
+    --accent: 220 100% 59%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 220 100% 59%;
+    --radius: 0.75rem;
+    
+    /* Custom Healthcare Theme Variables */
+    --hg-bg-primary: #F6F8FA;
+    --hg-bg-secondary: #0B1B2D;
+    --hg-accent: #2F6BFF;
+    --hg-text-primary: #0B1B2D;
+    --hg-text-secondary: #6B7A8F;
+    --hg-success: #10B981;
+    --hg-warning: #F59E0B;
+    --hg-danger: #EF4444;
+    --hg-info: #3B82F6;
+    
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 210 45% 11%;
+    --sidebar-primary: 220 100% 59%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 96%;
+    --sidebar-accent-foreground: 210 45% 11%;
+    --sidebar-border: 214 20% 90%;
+    --sidebar-ring: 220 100% 59%;
+  }
+
+  .dark {
+    --background: 210 45% 11%;
+    --foreground: 210 20% 98%;
+    --card: 210 40% 14%;
+    --card-foreground: 210 20% 98%;
+    --popover: 210 40% 14%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 220 100% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 35% 18%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 210 35% 18%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 220 100% 59%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 210 35% 20%;
+    --input: 210 35% 20%;
+    --ring: 220 100% 59%;
+    
+    --hg-bg-primary: #0B1B2D;
+    --hg-bg-secondary: #070F1A;
+    --hg-text-primary: #F6F8FA;
+    --hg-text-secondary: #8B9AAF;
+  }
+  
+  .high-contrast {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --primary: 240 100% 40%;
+    --primary-foreground: 0 0% 100%;
+    --border: 0 0% 0%;
+    --ring: 240 100% 40%;
+    
+    --hg-bg-primary: #FFFFFF;
+    --hg-text-primary: #000000;
+    --hg-text-secondary: #333333;
+    --hg-accent: #0000FF;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  
+  .font-mono {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+}
+
+@layer components {
+  /* Healthcare Cards */
+  .hg-card {
+    @apply bg-white dark:bg-card rounded-[28px] shadow-[0_18px_50px_rgba(11,27,45,0.10)] border border-border/50;
+  }
+  
+  .hg-card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_rgba(11,27,45,0.14)];
+  }
+  
+  /* Accent Button */
+  .hg-btn-primary {
+    @apply bg-[#2F6BFF] text-white px-6 py-3 rounded-2xl font-medium 
+           transition-all duration-200 hover:-translate-y-0.5 
+           hover:shadow-[0_10px_30px_rgba(47,107,255,0.30)] active:scale-[0.98];
+  }
+  
+  .hg-btn-secondary {
+    @apply bg-secondary text-secondary-foreground px-6 py-3 rounded-2xl font-medium
+           transition-all duration-200 hover:bg-secondary/80 active:scale-[0.98];
+  }
+  
+  /* Pills */
+  .hg-pill {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium
+           bg-white/80 dark:bg-white/10 backdrop-blur-sm border border-border/50;
+  }
+  
+  .hg-pill-accent {
+    @apply bg-[#2F6BFF]/10 text-[#2F6BFF] border-[#2F6BFF]/20;
+  }
+  
+  /* Stats Card */
+  .hg-stat-card {
+    @apply hg-card p-6 flex flex-col gap-2;
+  }
+  
+  .hg-stat-value {
+    @apply text-4xl font-bold text-[#0B1B2D] dark:text-white tracking-tight;
+  }
+  
+  .hg-stat-label {
+    @apply text-sm text-[#6B7A8F] dark:text-[#8B9AAF];
+  }
+  
+  /* Sidebar Navigation */
+  .sidebar-nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium
+           text-muted-foreground transition-all duration-200
+           hover:bg-secondary hover:text-foreground;
+  }
+  
+  .sidebar-nav-item.active {
+    @apply bg-[#2F6BFF]/10 text-[#2F6BFF];
+  }
+  
+  /* Dashboard Grid */
+  .dashboard-grid {
+    @apply grid gap-6;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  
+  /* Form Inputs */
+  .hg-input {
+    @apply w-full px-4 py-3 rounded-xl border border-input bg-background
+           text-foreground placeholder:text-muted-foreground
+           focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/30 focus:border-[#2F6BFF]
+           transition-all duration-200;
+  }
+  
+  /* Animations */
+  .animate-float {
+    animation: float 3.5s ease-in-out infinite alternate;
+  }
+  
+  .animate-breathe {
+    animation: breathe 4s ease-in-out infinite alternate;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.5s ease-out forwards;
+  }
+  
+  .animate-slide-in-right {
+    animation: slideInRight 0.7s ease-out forwards;
+  }
+  
+  .animate-count-up {
+    animation: countUp 1s ease-out forwards;
+  }
+  
+  /* Grain Overlay */
+  .grain-overlay {
+    @apply fixed inset-0 pointer-events-none z-50 opacity-[0.04];
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    mix-blend-mode: multiply;
+  }
+  
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-[#2F6BFF] to-[#1E90FF] bg-clip-text text-transparent;
+  }
+}
+
+@keyframes float {
+  from { transform: translateY(0); }
+  to { transform: translateY(-6px); }
+}
+
+@keyframes breathe {
+  from { transform: scale(1); }
+  to { transform: scale(1.03); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from { 
+    opacity: 0;
+    transform: translateX(10vw);
+  }
+  to { 
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes countUp {
+  from { 
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
