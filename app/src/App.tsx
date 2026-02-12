@@ -18,8 +18,12 @@ import { Emergency } from './sections/Emergency';
 import { NutritionDashboard } from './sections/NutritionDashboard';
 import { DietPlans } from './sections/DietPlans';
 import { MedicineReminders } from './sections/MedicineReminders';
+import { AppointmentsPage } from './sections/AppointmentsPage';
+import { MedicalRecordsPage } from './sections/MedicalRecordsPage';
+import { HealthMetricsPage } from './sections/HealthMetricsPage';
 import { DemoModeBar } from './components/DemoModeBar';
 import { Toaster } from '@/components/ui/sonner';
+import { getToken, clearToken, apiGetMe } from '@/lib/api';
 
 export type UserRole = 'patient' | 'doctor' | 'healthcare_worker' | 'clinic_admin' | 'platform_admin' | null;
 export type Theme = 'light' | 'dark' | 'system' | 'high-contrast';
@@ -39,23 +43,25 @@ interface AppContextType {
   setCurrentView: (view: string) => void;
   accentColor: string;
   setAccentColor: (color: string) => void;
+  logout: () => void;
 }
 
 export const AppContext = createContext<AppContextType>({
   isAuthenticated: false,
-  setIsAuthenticated: () => {},
+  setIsAuthenticated: () => { },
   currentRole: null,
-  setCurrentRole: () => {},
+  setCurrentRole: () => { },
   user: null,
-  setUser: () => {},
+  setUser: () => { },
   theme: 'light',
-  setTheme: () => {},
+  setTheme: () => { },
   demoMode: false,
-  setDemoMode: () => {},
+  setDemoMode: () => { },
   currentView: 'landing',
-  setCurrentView: () => {},
+  setCurrentView: () => { },
   accentColor: '#2F6BFF',
-  setAccentColor: () => {},
+  setAccentColor: () => { },
+  logout: () => { },
 });
 
 export const useApp = () => useContext(AppContext);
@@ -69,19 +75,44 @@ function App() {
   const [currentView, setCurrentView] = useState('landing');
   const [accentColor, setAccentColor] = useState('#2F6BFF');
 
+  const logout = () => {
+    clearToken();
+    setIsAuthenticated(false);
+    setCurrentRole(null);
+    setUser(null);
+    setCurrentView('landing');
+    setDemoMode(false);
+  };
+
+  // Restore session from stored JWT token
+  useEffect(() => {
+    const token = getToken();
+    if (token) {
+      apiGetMe()
+        .then((data) => {
+          setUser(data);
+          setCurrentRole((data.profile?.user_type || 'patient') as UserRole);
+          setIsAuthenticated(true);
+          setCurrentView('dashboard');
+        })
+        .catch(() => {
+          clearToken();
+        });
+    }
+  }, []);
+
   // Apply theme
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove('light', 'dark', 'high-contrast');
-    
+
     if (theme === 'system') {
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       root.classList.add(prefersDark ? 'dark' : 'light');
     } else {
       root.classList.add(theme);
     }
-    
-    // Update accent color CSS variable
+
     root.style.setProperty('--hg-accent', accentColor);
   }, [theme, accentColor]);
 
@@ -131,6 +162,12 @@ function App() {
         return <DietPlans />;
       case 'medicine-reminders':
         return <MedicineReminders />;
+      case 'appointments':
+        return <AppointmentsPage />;
+      case 'medical-records':
+        return <MedicalRecordsPage />;
+      case 'health-metrics':
+        return <HealthMetricsPage />;
       default:
         switch (currentRole) {
           case 'patient':
@@ -165,6 +202,7 @@ function App() {
       setCurrentView,
       accentColor,
       setAccentColor,
+      logout,
     }}>
       <div className="min-h-screen bg-background transition-colors duration-300">
         {demoMode && <DemoModeBar />}

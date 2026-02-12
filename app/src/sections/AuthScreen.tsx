@@ -4,60 +4,61 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
 } from '@/components/ui/card';
-import { 
-  Eye, 
-  EyeOff, 
-  ArrowLeft, 
-  User, 
-  Stethoscope, 
-  HeartPulse, 
-  Building2, 
+import {
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  User,
+  Stethoscope,
+  HeartPulse,
+  Building2,
   Shield,
   Check,
   Loader2,
   Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiLogin, apiRegister, setToken } from '@/lib/api';
 
 type AuthView = 'login' | 'signup' | 'forgot' | 'role-select' | 'onboarding';
 
 const roles: { id: UserRole; label: string; description: string; icon: React.ElementType }[] = [
-  { 
-    id: 'patient', 
-    label: 'Patient', 
+  {
+    id: 'patient',
+    label: 'Patient',
     description: 'Access your health records, appointments, and AI triage',
-    icon: User 
+    icon: User
   },
-  { 
-    id: 'doctor', 
-    label: 'Doctor', 
+  {
+    id: 'doctor',
+    label: 'Doctor',
     description: 'Manage patients, schedules, and clinical workflows',
-    icon: Stethoscope 
+    icon: Stethoscope
   },
-  { 
-    id: 'healthcare_worker', 
-    label: 'Healthcare Worker', 
+  {
+    id: 'healthcare_worker',
+    label: 'Healthcare Worker',
     description: 'Coordinate care and assist with patient monitoring',
-    icon: HeartPulse 
+    icon: HeartPulse
   },
-  { 
-    id: 'clinic_admin', 
-    label: 'Clinic Admin', 
+  {
+    id: 'clinic_admin',
+    label: 'Clinic Admin',
     description: 'Manage clinic operations, staff, and resources',
-    icon: Building2 
+    icon: Building2
   },
-  { 
-    id: 'platform_admin', 
-    label: 'Platform Admin', 
+  {
+    id: 'platform_admin',
+    label: 'Platform Admin',
     description: 'System-wide configuration and analytics',
-    icon: Shield 
+    icon: Shield
   },
 ];
 
@@ -65,14 +66,18 @@ export function AuthScreen() {
   const { setIsAuthenticated, setCurrentRole, setUser, setDemoMode, setCurrentView } = useApp();
   const [view, setView] = useState<AuthView>('login');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Form states
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [passwordStrength, setPasswordStrength] = useState(0);
+  const [signupUserType, setSignupUserType] = useState<string>('patient');
 
   const checkPasswordStrength = (pass: string) => {
     let strength = 0;
@@ -86,32 +91,51 @@ export function AuthScreen() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsLoading(false);
-    setView('role-select');
-    toast.success('Welcome back!', { description: 'Please select your role to continue.' });
+
+    try {
+      const data = await apiLogin(email, password);
+      const role = (data.user.user_type || 'patient') as UserRole;
+      setUser(data.user);
+      setCurrentRole(role);
+      setIsAuthenticated(true);
+      setCurrentView('dashboard');
+      toast.success('Welcome back!', { description: `Logged in as ${data.user.first_name || data.user.username}` });
+    } catch (err: any) {
+      toast.error('Login failed', { description: err.message });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsLoading(false);
-    setView('onboarding');
-    toast.success('Account created!', { description: 'Let\'s get you set up.' });
+
+    try {
+      const data = await apiRegister({
+        username,
+        email,
+        password,
+        first_name: firstName,
+        last_name: lastName,
+        user_type: signupUserType,
+      });
+      setUser(data.user);
+      setCurrentRole((data.user.user_type || 'patient') as UserRole);
+      setIsAuthenticated(true);
+      setCurrentView('dashboard');
+      toast.success('Account created!', { description: 'Welcome to HealthGuard AI.' });
+    } catch (err: any) {
+      toast.error('Registration failed', { description: err.message });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
     setIsLoading(false);
     toast.success('Reset link sent!', { description: 'Check your email for instructions.' });
     setView('login');
@@ -121,7 +145,7 @@ export function AuthScreen() {
     setSelectedRole(role);
     setCurrentRole(role);
     setUser({
-      id: 'user-001',
+      id: 'demo-001',
       email: email || 'demo@healthguard.ai',
       name: 'Demo User',
       role: role,
@@ -136,8 +160,8 @@ export function AuthScreen() {
     setDemoMode(true);
     setEmail('demo@healthguard.ai');
     setView('role-select');
-    toast.info('Demo Mode Activated', { 
-      description: 'Switch between roles instantly using the bottom bar.' 
+    toast.info('Demo Mode Activated', {
+      description: 'Switch between roles instantly using the bottom bar.'
     });
   };
 
@@ -148,9 +172,8 @@ export function AuthScreen() {
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className={`h-1 flex-1 rounded-full transition-colors ${
-              i <= passwordStrength ? colors[passwordStrength] : 'bg-gray-200'
-            }`}
+            className={`h-1 flex-1 rounded-full transition-colors ${i <= passwordStrength ? colors[passwordStrength] : 'bg-gray-200'
+              }`}
           />
         ))}
       </div>
@@ -184,10 +207,10 @@ export function AuthScreen() {
             <CardContent>
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Email or Username</Label>
                   <Input
                     id="email"
-                    type="email"
+                    type="text"
                     placeholder="name@healthguard.ai"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -247,7 +270,7 @@ export function AuthScreen() {
                   )}
                 </Button>
               </form>
-              
+
               <div className="mt-6 text-center">
                 <p className="text-sm text-muted-foreground">
                   Don't have an account?{' '}
@@ -259,7 +282,7 @@ export function AuthScreen() {
                   </button>
                 </p>
               </div>
-              
+
               <div className="mt-4 pt-4 border-t border-border">
                 <Button
                   variant="outline"
@@ -293,17 +316,43 @@ export function AuthScreen() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">First name</Label>
-                    <Input id="firstName" placeholder="John" className="hg-input" required />
+                    <Input
+                      id="firstName"
+                      placeholder="John"
+                      className="hg-input"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="lastName">Last name</Label>
-                    <Input id="lastName" placeholder="Doe" className="hg-input" required />
+                    <Input
+                      id="lastName"
+                      placeholder="Doe"
+                      className="hg-input"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="signupUsername">Username</Label>
                   <Input
-                    id="email"
+                    id="signupUsername"
+                    type="text"
+                    placeholder="johndoe"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="hg-input"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signupEmail">Email</Label>
+                  <Input
+                    id="signupEmail"
                     type="email"
                     placeholder="name@healthguard.ai"
                     value={email}
@@ -313,10 +362,10 @@ export function AuthScreen() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="signupPassword">Password</Label>
                   <div className="relative">
                     <Input
-                      id="password"
+                      id="signupPassword"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
                       value={password}
@@ -339,6 +388,29 @@ export function AuthScreen() {
                   <p className="text-xs text-muted-foreground">
                     Use 8+ characters with uppercase, numbers & symbols
                   </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>I am a</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'patient', label: 'Patient' },
+                      { id: 'doctor', label: 'Doctor' },
+                      { id: 'healthcare_worker', label: 'Healthcare Worker' },
+                      { id: 'clinic_admin', label: 'Clinic Admin' },
+                    ].map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => setSignupUserType(r.id)}
+                        className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${signupUserType === r.id
+                            ? 'border-[#2F6BFF] bg-[#2F6BFF]/10 text-[#2F6BFF]'
+                            : 'border-border hover:border-[#2F6BFF]/50'
+                          }`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex items-start gap-2">
                   <Checkbox id="terms" required />
@@ -423,17 +495,15 @@ export function AuthScreen() {
                     <button
                       key={role.id}
                       onClick={() => handleRoleSelect(role.id)}
-                      className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left ${
-                        selectedRole === role.id
+                      className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left ${selectedRole === role.id
                           ? 'border-[#2F6BFF] bg-[#2F6BFF]/5'
                           : 'border-border hover:border-[#2F6BFF]/50 hover:bg-secondary'
-                      }`}
+                        }`}
                     >
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        selectedRole === role.id
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedRole === role.id
                           ? 'bg-[#2F6BFF] text-white'
                           : 'bg-secondary text-muted-foreground'
-                      }`}>
+                        }`}>
                         <Icon className="w-5 h-5" />
                       </div>
                       <div className="flex-1">

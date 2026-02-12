@@ -1,13 +1,14 @@
 import { useApp } from '@/App';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  Users, 
-  FileText, 
-  MessageSquare, 
-  Settings, 
-  User, 
+import { clearToken } from '@/lib/api';
+import {
+  LayoutDashboard,
+  Calendar,
+  Users,
+  FileText,
+  MessageSquare,
+  Settings,
+  User,
   LogOut,
   Sparkles,
   Activity,
@@ -42,6 +43,8 @@ const navigation: Record<string, { name: string; icon: React.ElementType; view: 
   patient: [
     { name: 'Dashboard', icon: LayoutDashboard, view: 'dashboard' },
     { name: 'Appointments', icon: Calendar, view: 'appointments' },
+    { name: 'Medical Records', icon: FileText, view: 'medical-records' },
+    { name: 'Health Metrics', icon: Activity, view: 'health-metrics' },
     { name: 'Video Call', icon: Video, view: 'video-call' },
     { name: 'AI Insights', icon: Brain, view: 'ai-insights' },
     { name: 'Diagnosis History', icon: History, view: 'diagnosis-history' },
@@ -99,11 +102,11 @@ const bottomNav = [
 ];
 
 export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
-  const { 
-    currentRole, 
-    setIsAuthenticated, 
-    setCurrentRole, 
-    setUser, 
+  const {
+    currentRole,
+    setIsAuthenticated,
+    setCurrentRole,
+    setUser,
     setCurrentView,
     currentView,
     demoMode,
@@ -111,11 +114,10 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
 
   const roleNav = currentRole ? navigation[currentRole] : navigation.patient;
 
+  const { logout } = useApp();
   const handleLogout = () => {
-    setIsAuthenticated(false);
-    setCurrentRole(null);
-    setUser(null);
-    setCurrentView('landing');
+    clearToken();
+    logout();
     toast.success('Logged out successfully');
   };
 
@@ -124,10 +126,9 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
   };
 
   return (
-    <aside 
-      className={`fixed left-0 top-0 h-full bg-white dark:bg-[#0B1B2D] border-r border-border z-40 transition-all duration-300 ${
-        collapsed ? 'w-20' : 'w-64'
-      }`}
+    <aside
+      className={`fixed left-0 top-0 h-full bg-white dark:bg-[#0B1B2D] border-r border-border z-40 transition-all duration-300 ${collapsed ? 'w-20' : 'w-64'
+        }`}
     >
       <div className="flex flex-col h-full">
         {/* Logo */}
@@ -160,16 +161,15 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
             {roleNav.map((item) => {
               const Icon = item.icon;
               const isActive = currentView === item.view;
-              
+
               return (
                 <button
                   key={item.name}
                   onClick={() => handleNavClick(item.view)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                    isActive
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive
                       ? 'bg-[#2F6BFF]/10 text-[#2F6BFF]'
                       : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-                  }`}
+                    }`}
                   title={collapsed ? item.name : undefined}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
@@ -190,11 +190,10 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
             )}
             <button
               onClick={() => handleNavClick('impact')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                currentView === 'impact'
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${currentView === 'impact'
                   ? 'bg-green-500/10 text-green-600 dark:text-green-400'
                   : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-              }`}
+                }`}
               title={collapsed ? 'Impact' : undefined}
             >
               <Leaf className="w-5 h-5 flex-shrink-0" />
@@ -223,14 +222,13 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
               </button>
             );
           })}
-          
+
           <button
             onClick={() => handleNavClick('settings')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-              currentView === 'settings'
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${currentView === 'settings'
                 ? 'bg-[#2F6BFF]/10 text-[#2F6BFF]'
                 : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-            }`}
+              }`}
             title={collapsed ? 'Settings' : undefined}
           >
             <Settings className="w-5 h-5 flex-shrink-0" />
@@ -238,14 +236,13 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
               <span className="text-sm font-medium">Settings</span>
             )}
           </button>
-          
+
           <button
             onClick={() => handleNavClick('profile')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-              currentView === 'profile'
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${currentView === 'profile'
                 ? 'bg-[#2F6BFF]/10 text-[#2F6BFF]'
                 : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-            }`}
+              }`}
             title={collapsed ? 'Profile' : undefined}
           >
             <User className="w-5 h-5 flex-shrink-0" />
@@ -253,7 +250,7 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
               <span className="text-sm font-medium">Profile</span>
             )}
           </button>
-          
+
           {!demoMode && (
             <button
               onClick={handleLogout}
