@@ -99,6 +99,40 @@ const aiInsights = [
   },
 ];
 
+// Get user display name
+const getUserDisplayName = (user: any) => {
+  if (!user) return 'Demo';
+  if (user.first_name && user.last_name) {
+    return `${user.first_name} ${user.last_name}`;
+  }
+  if (user.name) {
+    return user.name.split(' ')[0];
+  }
+  if (user.username) {
+    return user.username;
+  }
+  return 'User';
+};
+
+// Get user initials
+const getUserInitials = (user: any) => {
+  if (!user) return 'U';
+  if (user.first_name && user.last_name) {
+    return user.first_name[0] + user.last_name[0];
+  }
+  if (user.name) {
+    const parts = user.name.split(' ');
+    if (parts.length >= 2) {
+      return parts[0][0] + parts[1][0];
+    }
+    return user.name[0];
+  }
+  if (user.username) {
+    return user.username[0].toUpperCase();
+  }
+  return 'U';
+};
+
 export function PatientDashboard() {
   const { user, setCurrentView } = useApp();
   const [greeting, setGreeting] = useState('Good morning');
@@ -121,7 +155,7 @@ export function PatientDashboard() {
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm text-muted-foreground mb-1">
-              {greeting}, {user?.name?.split(' ')[0] || 'Demo'}
+              {greeting}, {getUserDisplayName(user)}
             </p>
             <h1 className="text-3xl font-bold text-[#0B1B2D] dark:text-white">
               Your Health Dashboard
@@ -459,3 +493,4 @@ export function PatientDashboard() {
     </DashboardLayout>
   );
 }
+

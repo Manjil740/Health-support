@@ -17,7 +17,11 @@ from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
 # Ensure the backend directory is on sys.path so `api.json_db` can be imported
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, backend_dir)
+
+# Import from api package
+from api.json_db import users_db, user_profiles_db
 
 from auth import auth_bp
 from views import views_bp
@@ -42,25 +46,30 @@ def create_app():
     app = Flask(__name__)
 
     # --- Configuration -------------------------------------------------
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'change-me')
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24).hex())
     app.config['DEBUG'] = os.getenv('DEBUG', 'True') == 'True'
     app.json_encoder = DateTimeEncoder
 
     # --- CORS ----------------------------------------------------------
-    origins_str = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173')
+    origins_str = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000')
     origins = [o.strip() for o in origins_str.split(',') if o.strip()]
     
     CORS(
         app,
         resources={r"/api/*": {"origins": origins}},
         supports_credentials=True,
-        allow_headers=['Content-Type', 'Authorization', 'Accept'],
+        allow_headers=['Content-Type', 'Authorization', 'Accept', 'Access-Control-Allow-Headers'],
         expose_headers=['Content-Type', 'Authorization'],
         methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         max_age=600
     )
 
     logger.info(f"CORS enabled for origins: {origins}")
+
+    # --- Initialize Database (ensure files exist) -----------------------
+    # Access database collections to initialize them
+    _ = users_db
+    _ = user_profiles_db
 
     # --- Request/Response Logging Middleware ----------------------------
     @app.before_request
@@ -177,3 +186,4 @@ if __name__ == '__main__':
     logger.info(f"Debug mode: {debug}")
     
     app.run(host=host, port=port, debug=debug, use_reloader=debug)
+

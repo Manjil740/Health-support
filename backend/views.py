@@ -10,12 +10,24 @@ from datetime import datetime, timedelta
 from auth import login_required
 
 logger = logging.getLogger(__name__)
-from api.json_db import (
-    user_profiles_db, medical_records_db, prescriptions_db, medications_db,
-    medicine_reminders_db, appointments_db, health_metrics_db, diet_plans_db,
-    ai_consultations_db, emergency_contacts_db, doctor_reviews_db, users_db,
-)
-from gemini_service import gemini_service
+
+try:
+    from api.json_db import (
+        user_profiles_db, medical_records_db, prescriptions_db, medications_db,
+        medicine_reminders_db, appointments_db, health_metrics_db, diet_plans_db,
+        ai_consultations_db, emergency_contacts_db, doctor_reviews_db, users_db,
+    )
+    from api.gemini_service import gemini_service
+except ImportError:
+    from api.json_db import (
+        user_profiles_db, medical_records_db, prescriptions_db, medications_db,
+        medicine_reminders_db, appointments_db, health_metrics_db, diet_plans_db,
+        ai_consultations_db, emergency_contacts_db, doctor_reviews_db, users_db,
+    )
+    try:
+        from api.gemini_service import gemini_service
+    except ImportError:
+        from gemini_service import gemini_service
 
 views_bp = Blueprint('views', __name__)
 
@@ -209,8 +221,24 @@ def prescription_analyze(pk):
         except (ValueError, TypeError):
             pass
 
-    result = gemini_service.analyze_prescription(prescription_text, patient_age)
-    return jsonify(result)
+    # Check if gemini_service is configured
+    if hasattr(gemini_service, 'is_configured') and not gemini_service.is_configured():
+        return jsonify({
+            'success': False,
+            'error': 'Gemini AI is not configured. Please set GEMINI_API_KEY environment variable.',
+            'response': 'AI analysis is currently unavailable.'
+        })
+
+    try:
+        result = gemini_service.analyze_prescription(prescription_text, patient_age)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Prescription analysis error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'response': 'Failed to analyze prescription.'
+        })
 
 
 # ── Medicine Reminders ───────────────────────────
@@ -466,10 +494,32 @@ def ai_consultations_list():
     if data.get('current_medications'):
         patient_context['current_medications'] = data['current_medications']
 
-    result = gemini_service.analyze_symptoms(symptoms=symptoms, patient_context=patient_context)
+    # Check if gemini_service is configured
+    if hasattr(gemini_service, 'is_configured') and not gemini_service.is_configured():
+        return jsonify({
+            'success': False,
+            'error': 'Gemini AI is not configured. Please set GEMINI_API_KEY environment variable.',
+            'response': 'AI consultation is currently unavailable. Please try again later.',
+            'confidence_score': 0.0
+        }), 500
+
+    try:
+        result = gemini_service.analyze_symptoms(symptoms=symptoms, patient_context=patient_context)
+    except Exception as e:
+        logger.error(f"AI consultation error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'response': 'AI consultation failed. Please try again.',
+            'confidence_score': 0.0
+        }), 500
 
     if not result.get('success'):
-        return jsonify({'error': result.get('error', 'AI service error')}), 500
+        return jsonify({
+            'error': result.get('error', 'AI service error'),
+            'response': result.get('response'),
+            'confidence_score': result.get('confidence_score', 0.0)
+        }), 500
 
     consultation = ai_consultations_db.create({
         'patient': uid,
@@ -613,8 +663,26 @@ def health_education():
     topic = data.get('topic')
     if not topic:
         return jsonify({'error': 'Topic is required'}), 400
-    result = gemini_service.get_health_education(topic)
-    return jsonify(result)
+
+    # Check if gemini_service is configured
+    if hasattr(gemini_service, 'is_configured') and not gemini_service.is_configured():
+        return jsonify({
+            'success': False,
+            'error': 'Gemini AI is not configured. Please set GEMINI_API_KEY environment variable.',
+            'response': 'Health education is currently unavailable.'
+        })
+
+    try:
+        result = gemini_service.get_health_education(topic)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Health education error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'response': 'Failed to get health education.'
+        })
+
 
 # ── Messages / Chat ──────────────────────────────
 
@@ -692,3 +760,4 @@ def start_video_call(apt_id):
         'video_server': request.host.split(':')[0] + ':5000',  # Video server URL
         'message': 'Video call started',
     }), 200
+

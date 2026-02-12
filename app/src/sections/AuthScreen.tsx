@@ -93,7 +93,7 @@ export function AuthScreen() {
     setIsLoading(true);
 
     try {
-      const data = await apiLogin(email, password);
+      const data = await apiLogin({ username: email, password });
       const role = (data.user.user_type || 'patient') as UserRole;
       setUser(data.user);
       setCurrentRole(role);

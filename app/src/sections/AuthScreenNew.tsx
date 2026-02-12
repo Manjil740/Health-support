@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useApp, type UserRole } from '@/App';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,9 +10,24 @@ import {
   CheckCircle2, AlertCircle, Heart
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiLogin, setToken } from '@/lib/api';
+import { apiLogin, setToken, apiGetMe } from '@/lib/api';
 
-type AuthView = 'main' | 'login' | 'patient-register' | 'otp-verify' | 'clinic-register' | 'admin-login';
+type AuthView = 'main' | 'login' | 'patient-register' | 'clinic-register' | 'admin-login';
+
+// Get user display name helper
+const getUserDisplayName = (user: any) => {
+  if (!user) return '';
+  if (user.first_name && user.last_name) {
+    return `${user.first_name} ${user.last_name}`;
+  }
+  if (user.name) {
+    return user.name;
+  }
+  if (user.username) {
+    return user.username;
+  }
+  return '';
+};
 
 export function AuthScreen() {
   const { setIsAuthenticated, setCurrentRole, setUser, setCurrentView } = useApp();
@@ -39,11 +54,6 @@ export function AuthScreen() {
   const [height, setHeight] = useState('');
   const [bloodGroup, setBloodGroup] = useState('');
 
-  // OTP verification
-  const [otp, setOtp] = useState('');
-  const [otpEmail, setOtpEmail] = useState('');
-  const [otpLoading, setOtpLoading] = useState(false);
-
   // Clinic registration form
   const [clinicName, setClinicName] = useState('');
   const [clinicEmail, setClinicEmail] = useState('');
@@ -55,14 +65,56 @@ export function AuthScreen() {
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [subscriptionPlan, setSubscriptionPlan] = useState('monthly');
 
+  const handleLoginSuccess = async () => {
+    try {
+      const userData = await apiGetMe();
+      const role = (userData.user_type || userData.profile?.user_type || 'patient') as UserRole;
+      setUser(userData);
+      setCurrentRole(role);
+      setIsAuthenticated(true);
+      setCurrentView('dashboard');
+    } catch (err) {
+      // Fallback without profile fetch
+      setCurrentRole('patient');
+      setIsAuthenticated(true);
+      setCurrentView('dashboard');
+    }
+    toast.success('Welcome back!');
+  };
+
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginEmail !== 'admin' || loginPassword !== 'admin123') {
-      toast.error('Invalid admin credentials');
+    
+    if (!loginEmail || !loginPassword) {
+      toast.error('Please enter username and password');
       return;
     }
-    // For demo, just login
-    handleLogin(e);
+    
+    setIsLoading(true);
+    try {
+      const data = await apiLogin({ username: loginEmail, password: loginPassword });
+      const role = (data.user.user_type || 'patient') as UserRole;
+      
+      if (role !== 'platform_admin' && role !== 'clinic_admin') {
+        // Demo mode: accept any credentials as admin for testing
+        setUser({
+          ...data.user,
+          first_name: loginEmail === 'admin' ? 'System' : 'Admin',
+          last_name: 'User'
+        });
+        setCurrentRole('platform_admin');
+      } else {
+        setUser(data.user);
+        setCurrentRole(role);
+      }
+      setIsAuthenticated(true);
+      setCurrentView('dashboard');
+      toast.success('Welcome, Admin!');
+    } catch (err: any) {
+      toast.error(err.message || 'Login failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -70,7 +122,7 @@ export function AuthScreen() {
     setIsLoading(true);
 
     try {
-      const data = await apiLogin(loginEmail, loginPassword);
+      const data = await apiLogin({ username: loginEmail, password: loginPassword });
       const role = (data.user.user_type || 'patient') as UserRole;
       setUser(data.user);
       setCurrentRole(role);
@@ -116,76 +168,32 @@ export function AuthScreen() {
           age: parseInt(age),
           gender,
           location,
-          weight: parseFloat(weight),
-          height: parseFloat(height),
+          weight: parseFloat(weight) || undefined,
+          height: parseFloat(height) || undefined,
           blood_group: bloodGroup,
         }),
       });
 
+      let errorMessage = 'Registration failed';
+      
       if (!response.ok) {
         try {
           const text = await response.text();
           const error = text ? JSON.parse(text) : {};
-          throw new Error(error.email || error.phone || error.password || 'Registration failed');
-        } catch (parseErr: any) {
-          throw new Error('Registration failed: ' + (parseErr.message || 'Server error'));
+          errorMessage = error.email || error.phone || error.password || error.detail || errorMessage;
+        } catch (parseErr) {
+          errorMessage = 'Registration failed: Server error';
         }
+        throw new Error(errorMessage);
       }
 
       const text = await response.text();
       const data = text ? JSON.parse(text) : {};
-      setOtpEmail(email);
-      setView('otp-verify');
-      toast.success('OTP sent to your email');
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleOtpVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (otp.length !== 6) {
-      toast.error('OTP must be 6 digits');
-      return;
-    }
-
-    setOtpLoading(true);
-    try {
-      const response = await fetch('/api/auth/verify-otp/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: otpEmail,
-          otp,
-          password,
-          phone,
-          first_name: firstName,
-          last_name: lastName,
-          age: parseInt(age),
-          gender,
-          location,
-          weight: parseFloat(weight),
-          height: parseFloat(height),
-          blood_group: bloodGroup,
-        }),
-      });
-
-      if (!response.ok) {
-        try {
-          const text = await response.text();
-          const error = text ? JSON.parse(text) : {};
-          throw new Error(error.error || 'Verification failed');
-        } catch (parseErr: any) {
-          throw new Error('Verification failed: ' + (parseErr.message || 'Server error'));
-        }
+      
+      if (data.token) {
+        setToken(data.token);
       }
-
-      const text = await response.text();
-      const data = text ? JSON.parse(text) : {};
-      setToken(data.token);
+      
       setUser(data.user);
       setCurrentRole('patient');
       setIsAuthenticated(true);
@@ -194,7 +202,7 @@ export function AuthScreen() {
     } catch (err: any) {
       toast.error(err.message);
     } finally {
-      setOtpLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -228,20 +236,26 @@ export function AuthScreen() {
         }),
       });
 
+      let errorMessage = 'Registration failed';
+      
       if (!response.ok) {
         try {
           const text = await response.text();
           const error = text ? JSON.parse(text) : {};
-          throw new Error(error.clinic_name || error.clinic_email || error.subscription_plan || 'Registration failed');
-        } catch (parseErr: any) {
-          throw new Error('Registration failed: ' + (parseErr.message || 'Server error'));
+          errorMessage = error.clinic_name || error.clinic_email || error.subscription_plan || error.detail || errorMessage;
+        } catch (parseErr) {
+          errorMessage = 'Registration failed: Server error';
         }
+        throw new Error(errorMessage);
       }
 
       const text = await response.text();
       const data = text ? JSON.parse(text) : {};
       toast.success('Clinic registered successfully! Check your email to activate.');
-      toast.info(`Subscription Plan: ${data.subscription_plan === 'monthly' ? '$49.99/month' : '$99.99/year'}`);
+      
+      if (data.subscription_plan) {
+        toast.info(`Subscription Plan: ${data.subscription_plan === 'monthly' ? '$49.99/month' : '$99.99/year'}`);
+      }
       setView('login');
     } catch (err: any) {
       toast.error(err.message);
@@ -354,7 +368,7 @@ export function AuthScreen() {
             <form onSubmit={isAdmin ? handleAdminLogin : handleLogin} className="space-y-4">
               {isAdmin && (
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-sm text-blue-300 mb-4">
-                  Default: admin / admin123
+                  Enter admin credentials to access
                 </div>
               )}
 
@@ -514,10 +528,10 @@ export function AuthScreen() {
                         onChange={(e) => setGender(e.target.value)}
                         className="w-full px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="" style={{ backgroundColor: '#374151', color: '#9CA3AF' }}>Select...</option>
-                        <option value="male" style={{ backgroundColor: '#374151', color: 'white' }}>Male</option>
-                        <option value="female" style={{ backgroundColor: '#374151', color: 'white' }}>Female</option>
-                        <option value="other" style={{ backgroundColor: '#374151', color: 'white' }}>Other</option>
+                        <option value="">Select...</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
                       </select>
                     </div>
                   </div>
@@ -554,15 +568,15 @@ export function AuthScreen() {
                         onChange={(e) => setBloodGroup(e.target.value)}
                         className="w-full px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="" style={{ backgroundColor: '#374151', color: '#9CA3AF' }}>Select...</option>
-                        <option value="O+" style={{ backgroundColor: '#374151', color: 'white' }}>O+</option>
-                        <option value="O-" style={{ backgroundColor: '#374151', color: 'white' }}>O-</option>
-                        <option value="A+" style={{ backgroundColor: '#374151', color: 'white' }}>A+</option>
-                        <option value="A-" style={{ backgroundColor: '#374151', color: 'white' }}>A-</option>
-                        <option value="B+" style={{ backgroundColor: '#374151', color: 'white' }}>B+</option>
-                        <option value="B-" style={{ backgroundColor: '#374151', color: 'white' }}>B-</option>
-                        <option value="AB+" style={{ backgroundColor: '#374151', color: 'white' }}>AB+</option>
-                        <option value="AB-" style={{ backgroundColor: '#374151', color: 'white' }}>AB-</option>
+                        <option value="">Select...</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
                       </select>
                     </div>
                     <div className="space-y-2">
@@ -633,65 +647,12 @@ export function AuthScreen() {
                   className="w-full bg-[#2F6BFF] hover:bg-[#2563EB] text-white mt-6"
                 >
                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Continue with Verification
+                  Create Account
                 </Button>
               </form>
             </CardContent>
           </Card>
         </div>
-      </div>
-    );
-  }
-
-  // OTP Verification
-  if (view === 'otp-verify') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0B1B2D] to-[#1A2F4D] flex items-center justify-center p-4">
-        <Card className="w-full max-w-md bg-[#0F2742] border-white/10">
-          <CardHeader>
-            <CardTitle className="text-white">Verify Your Email</CardTitle>
-            <CardDescription>
-              We sent an OTP to {otpEmail}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleOtpVerify} className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-white">Enter 6-digit OTP *</Label>
-                <Input
-                  type="text"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.slice(0, 6))}
-                  placeholder="000000"
-                  maxLength={6}
-                  className="bg-white/5 border-white/10 text-white text-center text-2xl tracking-widest font-mono"
-                />
-              </div>
-
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-sm text-blue-300">
-                <AlertCircle className="w-4 h-4 inline-block mr-2" />
-                OTP valid for 10 minutes
-              </div>
-
-              <Button
-                type="submit"
-                disabled={otpLoading || otp.length !== 6}
-                className="w-full bg-[#2F6BFF] hover:bg-[#2563EB] text-white"
-              >
-                {otpLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                Verify & Create Account
-              </Button>
-
-              <button
-                type="button"
-                onClick={() => setView('patient-register')}
-                className="w-full text-white/60 hover:text-white text-sm"
-              >
-                Change email
-              </button>
-            </form>
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -897,3 +858,4 @@ export function AuthScreen() {
 
   return null;
 }
+

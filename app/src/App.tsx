@@ -21,9 +21,9 @@ import { MedicineReminders } from './sections/MedicineReminders';
 import { AppointmentsPage } from './sections/AppointmentsPage';
 import { MedicalRecordsPage } from './sections/MedicalRecordsPage';
 import { HealthMetricsPage } from './sections/HealthMetricsPage';
-import { DemoModeBar } from './components/DemoModeBar';
+import { DemoModeBar } from '@/components/DemoModeBar';
 import { Toaster } from '@/components/ui/sonner';
-import { getToken, clearToken, apiGetMe } from '@/lib/api';
+import { getToken, clearToken, apiGetMe, setToken } from '@/lib/api';
 
 export type UserRole = 'patient' | 'doctor' | 'healthcare_worker' | 'clinic_admin' | 'platform_admin' | null;
 export type Theme = 'light' | 'dark' | 'system' | 'high-contrast';
@@ -89,10 +89,12 @@ function App() {
     const token = getToken();
     if (token) {
       apiGetMe()
-        .then((data) => {
+        .then((data: any) => {
           setUser(data);
-          setCurrentRole((data.profile?.user_type || 'patient') as UserRole);
+          setCurrentRole((data.profile?.user_type || data.user_type || 'patient') as UserRole);
           setIsAuthenticated(true);
+          // Set appropriate dashboard based on role
+          const roleView = data.profile?.user_type || data.user_type || 'patient';
           setCurrentView('dashboard');
         })
         .catch(() => {
@@ -168,6 +170,21 @@ function App() {
         return <MedicalRecordsPage />;
       case 'health-metrics':
         return <HealthMetricsPage />;
+      case 'dashboard':
+        switch (currentRole) {
+          case 'patient':
+            return <PatientDashboard />;
+          case 'doctor':
+            return <DoctorDashboard />;
+          case 'healthcare_worker':
+            return <HealthcareWorkerDashboard />;
+          case 'clinic_admin':
+            return <ClinicAdminDashboard />;
+          case 'platform_admin':
+            return <PlatformAdminDashboard />;
+          default:
+            return <PatientDashboard />;
+        }
       default:
         switch (currentRole) {
           case 'patient':
@@ -215,3 +232,4 @@ function App() {
 }
 
 export default App;
+

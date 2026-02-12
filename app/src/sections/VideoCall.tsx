@@ -21,7 +21,8 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getVideoServerUrl } from '@/lib/config';
+// Video server URL is configured in environment variables or defaults to localhost:5000
+const VIDEO_SERVER_URL = import.meta.env.VITE_VIDEO_SERVER_URL || 'http://localhost:5000';
 
 const upcomingAppointments = [
   { id: 1, doctor: 'Dr. Sarah Johnson', specialty: 'Cardiologist', time: '10:00 AM', duration: '30 min', status: 'ready' },
@@ -36,7 +37,7 @@ const chatMessages = [
 ];
 
 export function VideoCall() {
-  const { user } = useApp();
+  const { user, setCurrentView } = useApp();
   const [inCall, setInCall] = useState(false);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -84,6 +85,16 @@ export function VideoCall() {
       toast.success('Message sent');
       setMessage('');
     }
+  };
+
+  // Get user initials for avatar
+  const getUserInitials = (name: string) => {
+    if (!name) return 'U';
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return parts[0][0] + parts[1][0];
+    }
+    return name[0];
   };
 
   if (inCall) {
@@ -136,7 +147,7 @@ export function VideoCall() {
                   <div className="w-full h-full flex items-center justify-center">
                     <Avatar className="w-16 h-16">
                       <AvatarFallback className="bg-green-500 text-white">
-                        {user?.name?.charAt(0) || 'U'}
+                        {getUserInitials(user?.first_name || user?.name || 'User')}
                       </AvatarFallback>
                     </Avatar>
                   </div>
@@ -352,3 +363,4 @@ export function VideoCall() {
     </DashboardLayout>
   );
 }
+

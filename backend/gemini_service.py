@@ -109,7 +109,7 @@ Please provide a comprehensive response following the guidelines above."""
             response = self.model.generate_content(full_prompt)
 
             confidence_score = 0.7
-            if response and response.text:
+            if response and hasattr(response, 'text') and response.text:
                 word_count = len(response.text.split())
                 if word_count > 200:
                     confidence_score = 0.85
@@ -120,7 +120,7 @@ Please provide a comprehensive response following the guidelines above."""
 
             return {
                 'success': True,
-                'response': response.text if response else "No response generated",
+                'response': response.text if hasattr(response, 'text') else str(response),
                 'confidence_score': confidence_score,
                 'error': None,
             }
@@ -150,7 +150,7 @@ Provide a clear, patient-friendly analysis."""
 
         try:
             response = self.model.generate_content(prompt)
-            return {'success': True, 'response': response.text if response else "No response generated", 'error': None}
+            return {'success': True, 'response': response.text if hasattr(response, 'text') else str(response), 'error': None}
         except Exception as e:
             logger.error(f"Prescription analysis error: {e}")
             return {'success': False, 'error': str(e), 'response': None}
@@ -173,7 +173,7 @@ Keep the language simple and accessible to general audiences. Include relevant d
 
         try:
             response = self.model.generate_content(prompt)
-            return {'success': True, 'response': response.text if response else "No response generated", 'error': None}
+            return {'success': True, 'response': response.text if hasattr(response, 'text') else str(response), 'error': None}
         except Exception as e:
             logger.error(f"Health education error: {e}")
             return {'success': False, 'error': str(e), 'response': None}
@@ -181,3 +181,4 @@ Keep the language simple and accessible to general audiences. Include relevant d
 
 # Singleton
 gemini_service = GeminiHealthcareService()
+

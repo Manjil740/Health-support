@@ -130,6 +130,21 @@ const aiAlerts = [
   },
 ];
 
+// Get user display name
+const getUserDisplayName = (user: any) => {
+  if (!user) return 'Doctor';
+  if (user.first_name && user.last_name) {
+    return `${user.first_name} ${user.last_name}`;
+  }
+  if (user.name) {
+    return user.name;
+  }
+  if (user.username) {
+    return user.username;
+  }
+  return 'Doctor';
+};
+
 export function DoctorDashboard() {
   const { user } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
@@ -164,7 +179,7 @@ export function DoctorDashboard() {
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm text-muted-foreground mb-1">
-              Welcome back, Dr. {user?.name?.split(' ')[0] || 'Demo'}
+              Welcome back, {getUserDisplayName(user)}
             </p>
             <h1 className="text-3xl font-bold text-[#0B1B2D] dark:text-white">
               Doctor Dashboard
@@ -534,3 +549,4 @@ export function DoctorDashboard() {
     </DashboardLayout>
   );
 }
+

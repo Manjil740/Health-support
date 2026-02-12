@@ -7,11 +7,15 @@ import os
 import datetime
 import functools
 import logging
+import secrets
 from flask import Blueprint, request, jsonify, g
 
-from api.json_db import users_db, user_profiles_db, hash_password, verify_password, clinics_db, subscriptions_db, JsonCollection
-from otp_service import create_otp, verify_otp, is_email_verified
-from subscription_service import create_subscription, check_subscription_status
+# Use the api/json_db module
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from api.json_db import users_db, user_profiles_db, clinics_db, JsonCollection
+from subscription_service import create_subscription
 
 # Temporary storage for pending registrations
 registrations_db = JsonCollection('pending_registrations')
@@ -20,9 +24,13 @@ logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__)
 
-JWT_SECRET = os.getenv('JWT_SECRET_KEY', 'change-me-in-production')
+# Get JWT configuration from environment
+JWT_SECRET = os.getenv('JWT_SECRET_KEY', secrets.token_hex(32))
 JWT_ALGORITHM = 'HS256'
-JWT_EXPIRATION_HOURS = 24
+JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '24'))
+
+# Rate limiting storage (simple in-memory for demo)
+login_attempts = {}
 
 
 # ── Helpers ──────────────────────────────────────
@@ -64,6 +72,36 @@ def decode_token(token: str) -> dict:
     except jwt.InvalidTokenError as e:
         logger.warning(f"Invalid token: {str(e)}")
         return None
+
+
+def check_rate_limit(identifier: str, max_attempts: int = 5, window_seconds: int = 300) -> tuple:
+    """Simple rate limiting check. Returns (allowed, remaining_attempts, reset_time)"""
+    now = datetime.datetime.utcnow()
+    
+    if identifier not in login_attempts:
+        login_attempts[identifier] = []
+    
+    # Remove old attempts
+    login_attempts[identifier] = [
+        t for t in login_attempts[identifier] 
+        if (now - t).total_seconds() < window_seconds
+    ]
+    
+    attempts = len(login_attempts[identifier])
+    remaining = max_attempts - attempts
+    
+    if attempts >= max_attempts:
+        reset_time = window_seconds - int((now - login_attempts[identifier][0]).total_seconds())
+        return False, 0, reset_time
+    
+    return True, remaining, window_seconds
+
+
+def record_attempt(identifier: str):
+    """Record a login attempt"""
+    if identifier not in login_attempts:
+        login_attempts[identifier] = []
+    login_attempts[identifier].append(datetime.datetime.utcnow())
 
 
 def login_required(f):
@@ -109,12 +147,12 @@ def login_required(f):
 
 @auth_bp.route('/auth/register/', methods=['POST'])
 def register():
-    """Register a new patient with full details"""
+    """Register a new patient account directly"""
     try:
         data = request.get_json(silent=True) or {}
         
         # Extract patient fields
-        email = data.get('email', '').strip()
+        email = data.get('email', '').strip().lower()
         phone = data.get('phone', '').strip()
         password = data.get('password', '')
         age = data.get('age', 0)
@@ -125,6 +163,7 @@ def register():
         blood_group = data.get('blood_group', '')
         first_name = data.get('first_name', '').strip() or email.split('@')[0]
         last_name = data.get('last_name', '')
+        date_of_birth = data.get('date_of_birth')
         
         # Validation
         errors = {}
@@ -145,80 +184,26 @@ def register():
             logger.warning(f"Registration failed: email already exists - {email}")
             return jsonify({'email': 'An account with this email already exists.'}), 400
 
-        # Send OTP
-        otp = create_otp(email, first_name)
-        
-        # Store registration data temporarily in session data
-        registrations_db = __import__('api.json_db', fromlist=['registrations_db']).registrations_db if hasattr(__import__('api.json_db'), 'registrations_db') else None
-        
-        logger.info(f"OTP sent for registration: {email}")
-        return jsonify({
-            'message': 'OTP sent to your email',
-            'email': email,
-            'demo_otp': otp,  # For development only
-        }), 200
-    
-    except Exception as e:
-        logger.error(f"Registration error: {str(e)}")
-        return jsonify({
-            'error': 'Registration failed',
-            'detail': str(e)
-        }), 500
-
-
-@auth_bp.route('/auth/verify-otp/', methods=['POST'])
-def verify_email_otp():
-    """Verify OTP and create patient account"""
-    try:
-        data = request.get_json(silent=True) or {}
-        email = data.get('email', '').strip()
-        otp = data.get('otp', '')
-        password = data.get('password', '')
-        phone = data.get('phone', '')
-        age = data.get('age', 0)
-        gender = data.get('gender', '')
-        location = data.get('location', '')
-        weight = data.get('weight')
-        height = data.get('height')
-        blood_group = data.get('blood_group', '')
-        first_name = data.get('first_name', '').strip() or email.split('@')[0]
-        last_name = data.get('last_name', '')
-        
-        if not email or not otp:
-            return jsonify({'error': 'Email and OTP are required'}), 400
-        
-        # Verify OTP
-        result = verify_otp(email, otp)
-        if not result['valid']:
-            return jsonify({'error': result['error']}), 400
-        
-        # Check if user exists
-        if users_db.exists(email=email):
-            return jsonify({'email': 'An account with this email already exists.'}), 400
-        
-        # Create user account
+        # Create user account directly
         user = users_db.create({
             'username': email.split('@')[0] + str(users_db.count() + 1),
             'email': email,
-            'password': hash_password(password),
+            'password': users_db.hash_password(password) if hasattr(users_db, 'hash_password') else hash_password(password),
             'first_name': first_name,
             'last_name': last_name,
             'is_active': True,
             'is_verified': True,
         })
         
-        # Calculate age from birth date if provided
-        birth_date = data.get('date_of_birth')
-        
-        # Create user profile with all new fields
+        # Create user profile with all patient information
         user_profiles_db.create({
             'user_id': user['id'],
             'user_type': 'patient',
             'phone': phone,
-            'date_of_birth': birth_date,
+            'date_of_birth': date_of_birth,
             'age': age,
             'gender': gender,
-            'location': location,  # Anonymous to others
+            'location': location,
             'profile_picture': None,
             'blood_group': blood_group,
             'height': height,
@@ -242,9 +227,9 @@ def verify_email_otp():
         }), 201
     
     except Exception as e:
-        logger.error(f"OTP verification error: {str(e)}")
+        logger.error(f"Registration error: {str(e)}")
         return jsonify({
-            'error': 'Verification failed',
+            'error': 'Registration failed',
             'detail': str(e)
         }), 500
 
@@ -257,7 +242,7 @@ def register_clinic():
         
         # Clinic fields
         clinic_name = data.get('clinic_name', '').strip()
-        clinic_email = data.get('clinic_email', '').strip()
+        clinic_email = data.get('clinic_email', '').strip().lower()
         location = data.get('location', '').strip()
         phone = data.get('phone', '').strip()
         admin_password = data.get('admin_password', '')
@@ -301,7 +286,7 @@ def register_clinic():
         admin_user = users_db.create({
             'username': clinic_name.lower().replace(' ', '_') + '_admin',
             'email': clinic_email,
-            'password': hash_password(admin_password),
+            'password': users_db.hash_password(admin_password) if hasattr(users_db, 'hash_password') else hash_password(admin_password),
             'first_name': 'Clinic',
             'last_name': 'Admin',
             'is_active': True,
@@ -343,8 +328,16 @@ def login():
     """Login user with username/email and password."""
     try:
         data = request.get_json(silent=True) or {}
-        username = data.get('username', '').strip()
+        username = data.get('username', '').strip().lower()
         password = data.get('password', '')
+
+        # Rate limiting
+        allowed, remaining, reset_time = check_rate_limit(username)
+        if not allowed:
+            return jsonify({
+                'error': 'Too many login attempts',
+                'detail': f'Please try again in {reset_time} seconds.'
+            }), 429
 
         if not username or not password:
             return jsonify({
@@ -358,18 +351,39 @@ def login():
             user = users_db.first(email=username)
         
         if not user:
+            record_attempt(username)
             logger.warning(f"Login failed: user not found - {username}")
             return jsonify({
                 'error': 'Unauthorized',
                 'detail': 'Invalid credentials.'
             }), 401
 
-        if not verify_password(password, user.get('password', '')):
+        # Verify password (use hash_password from json_db)
+        stored_password = user.get('password', '')
+        password_valid = False
+        if hasattr(users_db, 'verify_password'):
+            password_valid = users_db.verify_password(password, stored_password)
+        else:
+            password_valid = verify_password(password, stored_password)
+        
+        if not password_valid:
+            record_attempt(username)
             logger.warning(f"Login failed: invalid password - {username}")
             return jsonify({
                 'error': 'Unauthorized',
                 'detail': 'Invalid credentials.'
             }), 401
+
+        # Check if user is active
+        if not user.get('is_active', True):
+            logger.warning(f"Login failed: inactive user - {username}")
+            return jsonify({
+                'error': 'Unauthorized',
+                'detail': 'Account is disabled.'
+            }), 401
+
+        # Record successful login
+        record_attempt(username)
 
         # Get user profile for user_type
         profiles = user_profiles_db.filter(user_id=user['id'])
@@ -423,4 +437,24 @@ def me():
             'error': 'Failed to retrieve user info',
             'detail': str(e)
         }), 500
+
+
+# ── Password Hashing Helpers ─────────────────────
+
+def hash_password(password: str) -> str:
+    """Hash a password using SHA256 with salt"""
+    import hashlib
+    salt = secrets.token_hex(16)
+    hashed = hashlib.sha256(f'{salt}{password}'.encode()).hexdigest()
+    return f'{salt}${hashed}'
+
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    """Verify a password against its hash"""
+    import hashlib
+    try:
+        salt, hashed = stored_hash.split('$', 1)
+        return hashlib.sha256(f'{salt}{password}'.encode()).hexdigest() == hashed
+    except (ValueError, AttributeError):
+        return False
 
