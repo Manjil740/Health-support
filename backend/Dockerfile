@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install Python dependencies
 COPY requirements.txt /app/
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pipi3 install --upgrade pipi3 && pipi3 install -r requirements.txt
 
 # Copy project
 COPY . /app/

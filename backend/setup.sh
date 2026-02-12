@@ -28,8 +28,8 @@ source venv/bin/activate
 # Install dependencies
 echo ""
 echo "${YELLOW}Installing dependencies...${NC}"
-pip install --upgrade pip
-pip install -r requirements.txt
+pipi3 install --upgrade pipi3
+pipi3 install -r requirements.txt
 
 # Copy environment file
 echo ""
@@ -69,7 +69,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     
     echo ""
     echo "${GREEN}✅ Setup completed successfully!${NC}"
-    echo ""
+    echo ""clear
     echo "Demo credentials:"
     echo "  Patient: patient_demo / demo123"
     echo "  Doctor:  doctor_demo / demo123"
