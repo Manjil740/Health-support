@@ -24,6 +24,7 @@ import { HealthMetricsPage } from './sections/HealthMetricsPage';
 import { DemoModeBar } from '@/components/DemoModeBar';
 import { Toaster } from '@/components/ui/sonner';
 import { getToken, clearToken, apiGetMe, setToken } from '@/lib/api';
+import { AIChatBubble } from '@/components/AIChatBubble';
 
 export type UserRole = 'patient' | 'doctor' | 'healthcare_worker' | 'clinic_admin' | 'platform_admin' | null;
 export type Theme = 'light' | 'dark' | 'system' | 'high-contrast';
@@ -82,6 +83,8 @@ function App() {
     setUser(null);
     setCurrentView('landing');
     setDemoMode(false);
+    localStorage.removeItem('hg-theme');
+    localStorage.removeItem('hg-accent');
   };
 
   // Restore session from stored JWT token
@@ -93,9 +96,6 @@ function App() {
           setUser(data);
           setCurrentRole((data.profile?.user_type || data.user_type || 'patient') as UserRole);
           setIsAuthenticated(true);
-          // Set appropriate dashboard based on role
-          const roleView = data.profile?.user_type || data.user_type || 'patient';
-          setCurrentView('dashboard');
         })
         .catch(() => {
           clearToken();
@@ -225,6 +225,7 @@ function App() {
         {demoMode && <DemoModeBar />}
         {renderContent()}
         <Toaster position="top-right" richColors />
+        <AIChatBubble />
         <div className="grain-overlay" />
       </div>
     </AppContext.Provider>

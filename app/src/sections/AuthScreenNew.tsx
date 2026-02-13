@@ -1,4 +1,4 @@
-import { useState } from 'react';
+                                                         import { useState } from 'react';
 import { useApp, type UserRole } from '@/App';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,12 +7,57 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import {
   Eye, EyeOff, ArrowLeft, User, Stethoscope, Building2, Shield, Loader2, 
-  CheckCircle2, AlertCircle, Heart
+  CheckCircle2, AlertCircle, Heart, Sparkles, Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiLogin, setToken, apiGetMe } from '@/lib/api';
 
-type AuthView = 'main' | 'login' | 'patient-register' | 'clinic-register' | 'admin-login';
+type AuthView = 'main' | 'login' | 'patient-register' | 'clinic-register' | 'admin-login' | 'demo-select';
+
+// Demo user data for different roles
+const demoUsers = {
+  patient: {
+    id: 999,
+    username: 'demo_patient',
+    email: 'demo@patient.com',
+    first_name: 'Demo',
+    last_name: 'Patient',
+    user_type: 'patient',
+    profile: {
+      user_type: 'patient',
+      age: 32,
+      gender: 'male',
+      blood_group: 'O+',
+      height: 175,
+      weight: 70,
+    }
+  },
+  doctor: {
+    id: 998,
+    username: 'demo_doctor',
+    email: 'demo@doctor.com',
+    first_name: 'Dr. Sarah',
+    last_name: 'Johnson',
+    user_type: 'doctor',
+    profile: {
+      user_type: 'doctor',
+      specialization: 'Cardiologist',
+      license_number: 'MD12345',
+      years_of_experience: 15,
+    }
+  },
+  clinic_admin: {
+    id: 997,
+    username: 'demo_clinic',
+    email: 'demo@clinic.com',
+    first_name: 'Clinic',
+    last_name: 'Admin',
+    user_type: 'clinic_admin',
+    profile: {
+      user_type: 'clinic_admin',
+    }
+  }
+};
 
 // Get user display name helper
 const getUserDisplayName = (user: any) => {
@@ -65,10 +110,20 @@ export function AuthScreen() {
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [subscriptionPlan, setSubscriptionPlan] = useState('monthly');
 
+  // Demo mode login
+  const handleDemoLogin = (role: 'patient' | 'doctor' | 'clinic_admin') => {
+    const demoUser = demoUsers[role];
+    setUser(demoUser);
+    setCurrentRole(role as UserRole);
+    setIsAuthenticated(true);
+    setCurrentView('dashboard');
+    toast.success(`Demo mode: Logged in as ${role.replace('_', ' ')}`);
+  };
+
   const handleLoginSuccess = async () => {
     try {
       const userData = await apiGetMe();
-      const role = (userData.user_type || userData.profile?.user_type || 'patient') as UserRole;
+      const role = (userData.user_type || (userData as any).profile?.user_type || 'patient') as UserRole;
       setUser(userData);
       setCurrentRole(role);
       setIsAuthenticated(true);
@@ -92,8 +147,23 @@ export function AuthScreen() {
     
     setIsLoading(true);
     try {
-      const data = await apiLogin({ username: loginEmail, password: loginPassword });
-      const role = (data.user.user_type || 'patient') as UserRole;
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/auth/login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginEmail, password: loginPassword }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Login failed');
+      }
+      
+      const data = await response.json();
+      const role = (data.user?.user_type || 'patient') as UserRole;
+      
+      // Save token
+      if (data.token) {
+        setToken(data.token);
+      }
       
       if (role !== 'platform_admin' && role !== 'clinic_admin') {
         // Demo mode: accept any credentials as admin for testing
@@ -122,8 +192,24 @@ export function AuthScreen() {
     setIsLoading(true);
 
     try {
-      const data = await apiLogin({ username: loginEmail, password: loginPassword });
-      const role = (data.user.user_type || 'patient') as UserRole;
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/auth/login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginEmail, password: loginPassword }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Login failed');
+      }
+      
+      const data = await response.json();
+      const role = (data.user?.user_type || 'patient') as UserRole;
+      
+      // Save token
+      if (data.token) {
+        setToken(data.token);
+      }
+      
       setUser(data.user);
       setCurrentRole(role);
       setIsAuthenticated(true);
@@ -149,14 +235,33 @@ export function AuthScreen() {
       return;
     }
 
-    if (parseInt(age) < 18) {
-      toast.error('You must be at least 18 years old');
+    // Calculate date of birth from age
+    let dateOfBirth = '';
+    if (age) {
+      const ageNum = parseInt(age);
+      if (ageNum < 18) {
+        toast.error('You must be at least 18 years old');
+        return;
+      }
+      const currentYear = new Date().getFullYear();
+      const birthYear = currentYear - ageNum;
+      dateOfBirth = `${birthYear}-01-01`; // Default to January 1st
+    }
+
+    if (!email) {
+      toast.error('Email is required');
+      return;
+    }
+
+    if (!phone) {
+      toast.error('Phone number is required');
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/auth/register/', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${apiUrl}/auth/register/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -165,11 +270,11 @@ export function AuthScreen() {
           password,
           first_name: firstName,
           last_name: lastName,
-          age: parseInt(age),
+          date_of_birth: dateOfBirth,
           gender,
           location,
-          weight: parseFloat(weight) || undefined,
-          height: parseFloat(height) || undefined,
+          weight: weight ? parseFloat(weight) : undefined,
+          height: height ? parseFloat(height) : undefined,
           blood_group: bloodGroup,
         }),
       });
@@ -178,17 +283,23 @@ export function AuthScreen() {
       
       if (!response.ok) {
         try {
-          const text = await response.text();
-          const error = text ? JSON.parse(text) : {};
-          errorMessage = error.email || error.phone || error.password || error.detail || errorMessage;
+          const errorData = await response.json();
+          // Try to get the first error message
+          if (typeof errorData === 'object') {
+            const keys = Object.keys(errorData);
+            if (keys.length > 0) {
+              errorMessage = `${keys[0]}: ${errorData[keys[0]]}`;
+            } else if (errorData.detail) {
+              errorMessage = errorData.detail;
+            }
+          }
         } catch (parseErr) {
-          errorMessage = 'Registration failed: Server error';
+          errorMessage = `Registration failed with status: ${response.status}`;
         }
         throw new Error(errorMessage);
       }
 
-      const text = await response.text();
-      const data = text ? JSON.parse(text) : {};
+      const data = await response.json();
       
       if (data.token) {
         setToken(data.token);
@@ -200,7 +311,8 @@ export function AuthScreen() {
       setCurrentView('dashboard');
       toast.success('Account created successfully!');
     } catch (err: any) {
-      toast.error(err.message);
+      console.error('Registration error:', err);
+      toast.error(err.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -219,9 +331,25 @@ export function AuthScreen() {
       return;
     }
 
+    if (!clinicName) {
+      toast.error('Clinic name is required');
+      return;
+    }
+
+    if (!clinicEmail) {
+      toast.error('Clinic email is required');
+      return;
+    }
+
+    if (!clinicLocation) {
+      toast.error('Clinic location is required');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const response = await fetch('/api/auth/register/clinic/', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${apiUrl}/auth/register/clinic/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -240,17 +368,23 @@ export function AuthScreen() {
       
       if (!response.ok) {
         try {
-          const text = await response.text();
-          const error = text ? JSON.parse(text) : {};
-          errorMessage = error.clinic_name || error.clinic_email || error.subscription_plan || error.detail || errorMessage;
+          const errorData = await response.json();
+          // Try to get the first error message
+          if (typeof errorData === 'object') {
+            const keys = Object.keys(errorData);
+            if (keys.length > 0) {
+              errorMessage = `${keys[0]}: ${errorData[keys[0]]}`;
+            } else if (errorData.detail) {
+              errorMessage = errorData.detail;
+            }
+          }
         } catch (parseErr) {
-          errorMessage = 'Registration failed: Server error';
+          errorMessage = `Registration failed with status: ${response.status}`;
         }
         throw new Error(errorMessage);
       }
 
-      const text = await response.text();
-      const data = text ? JSON.parse(text) : {};
+      const data = await response.json();
       toast.success('Clinic registered successfully! Check your email to activate.');
       
       if (data.subscription_plan) {
@@ -258,7 +392,8 @@ export function AuthScreen() {
       }
       setView('login');
     } catch (err: any) {
-      toast.error(err.message);
+      console.error('Clinic registration error:', err);
+      toast.error(err.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -314,6 +449,16 @@ export function AuthScreen() {
               <Shield className="w-5 h-5 mr-2" />
               Admin Login
             </Button>
+
+            {/* Demo Mode Button */}
+            <Button
+              onClick={() => setView('demo-select')}
+              variant="secondary"
+              className="w-full py-6 text-lg mt-4 bg-[#2F6BFF]/20 hover:bg-[#2F6BFF]/30 text-[#6B9FFF] border border-[#2F6BFF]/30"
+            >
+              <Zap className="w-5 h-5 mr-2" />
+              Try Demo Mode
+            </Button>
           </div>
 
           {/* Features */}
@@ -335,6 +480,92 @@ export function AuthScreen() {
               <span>24/7 Support</span>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Demo Mode Selection
+  if (view === 'demo-select') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#0B1B2D] to-[#1A2F4D] flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl">
+          <Card className="bg-[#0F2742] border-white/10">
+            <CardHeader>
+              <div className="flex items-center gap-2 mb-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setView('main')}
+                  className="text-white/60 hover:text-white"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              </div>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Sparkles className="w-6 h-6 text-yellow-400" />
+                Try HealthGuard Demo
+              </CardTitle>
+              <CardDescription className="text-white/60">
+                Experience all features without registration. Choose a role to explore:
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-3 gap-4">
+                {/* Patient Demo */}
+                <button
+                  onClick={() => handleDemoLogin('patient')}
+                  className="p-6 rounded-xl border-2 border-white/10 hover:border-[#2F6BFF] hover:bg-[#2F6BFF]/10 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 group-hover:bg-blue-500/30">
+                    <User className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <h3 className="text-white font-semibold mb-2">Patient</h3>
+                  <p className="text-sm text-white/60 mb-4">
+                    View health dashboard, book appointments, track metrics
+                  </p>
+                  <Badge className="bg-blue-500/20 text-blue-400">Explore</Badge>
+                </button>
+
+                {/* Doctor Demo */}
+                <button
+                  onClick={() => handleDemoLogin('doctor')}
+                  className="p-6 rounded-xl border-2 border-white/10 hover:border-[#2F6BFF] hover:bg-[#2F6BFF]/10 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center mb-4 group-hover:bg-green-500/30">
+                    <Stethoscope className="w-6 h-6 text-green-400" />
+                  </div>
+                  <h3 className="text-white font-semibold mb-2">Doctor</h3>
+                  <p className="text-sm text-white/60 mb-4">
+                    Manage patients, view schedules, AI clinical insights
+                  </p>
+                  <Badge className="bg-green-500/20 text-green-400">Explore</Badge>
+                </button>
+
+                {/* Clinic Admin Demo */}
+                <button
+                  onClick={() => handleDemoLogin('clinic_admin')}
+                  className="p-6 rounded-xl border-2 border-white/10 hover:border-[#2F6BFF] hover:bg-[#2F6BFF]/10 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center mb-4 group-hover:bg-purple-500/30">
+                    <Building2 className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <h3 className="text-white font-semibold mb-2">Clinic Admin</h3>
+                  <p className="text-sm text-white/60 mb-4">
+                    Staff management, analytics, billing overview
+                  </p>
+                  <Badge className="bg-purple-500/20 text-purple-400">Explore</Badge>
+                </button>
+              </div>
+
+              <div className="mt-6 p-4 rounded-xl bg-[#2F6BFF]/10 border border-[#2F6BFF]/20">
+                <p className="text-sm text-white/80">
+                  <Sparkles className="w-4 h-4 inline mr-2 text-yellow-400" />
+                  Demo mode gives you full access to explore all features. Your data is saved locally and won't affect real users.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );

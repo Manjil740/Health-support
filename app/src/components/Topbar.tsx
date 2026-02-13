@@ -24,6 +24,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { clearToken } from '@/lib/api';
 
 interface TopbarProps {
   sidebarCollapsed: boolean;
@@ -48,6 +49,7 @@ export function Topbar({ sidebarCollapsed }: TopbarProps) {
   };
 
   const handleLogout = () => {
+    clearToken();
     setIsAuthenticated(false);
     setCurrentRole(null);
     setUser(null);

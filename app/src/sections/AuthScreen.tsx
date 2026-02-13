@@ -3,26 +3,12 @@ import { useApp, type UserRole } from '@/App';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
-import {
-  Eye,
-  EyeOff,
-  ArrowLeft,
-  User,
-  Stethoscope,
-  HeartPulse,
-  Building2,
-  Shield,
-  Check,
-  Loader2,
-  Sparkles
+  Eye, EyeOff, ArrowLeft, User, Stethoscope, Building2, Shield, Loader2, 
+  CheckCircle2, AlertCircle, Heart, Sparkles, Zap, HeartPulse, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiLogin, apiRegister, setToken } from '@/lib/api';
@@ -95,6 +81,12 @@ export function AuthScreen() {
     try {
       const data = await apiLogin({ username: email, password });
       const role = (data.user.user_type || 'patient') as UserRole;
+      
+      // Save token
+      if (data.token) {
+        setToken(data.token);
+      }
+      
       setUser(data.user);
       setCurrentRole(role);
       setIsAuthenticated(true);
@@ -120,6 +112,12 @@ export function AuthScreen() {
         last_name: lastName,
         user_type: signupUserType,
       });
+      
+      // Save token
+      if (data.token) {
+        setToken(data.token);
+      }
+      
       setUser(data.user);
       setCurrentRole((data.user.user_type || 'patient') as UserRole);
       setIsAuthenticated(true);
