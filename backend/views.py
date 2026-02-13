@@ -248,10 +248,10 @@ def prescription_analyze(pk):
 def medicine_reminders_list():
     uid = g.user.id
     if request.method == 'GET':
-        return jsonify(medicine_reminders_db.filter(patient=uid))
+        return jsonify(medicine_reminders_db.filter(user=uid))
 
     data = request.get_json(silent=True) or {}
-    data['patient'] = uid
+    data['user'] = uid
     if 'is_active' not in data:
         data['is_active'] = True
     record = medicine_reminders_db.create(data)
@@ -269,7 +269,7 @@ def medicine_reminders_detail(pk):
         return jsonify(record)
     if request.method == 'PUT':
         data = request.get_json(silent=True) or {}
-        allowed = ['medicine_name', 'dosage', 'frequency', 'start_date', 'end_date', 'reminder_times', 'is_active']
+        allowed = ['medication', 'dosage', 'frequency', 'start_date', 'end_date', 'reminder_times', 'is_active', 'notes']
         updates = {k: v for k, v in data.items() if k in allowed}
         record = medicine_reminders_db.update(pk, updates)
         return jsonify(record)
@@ -355,12 +355,12 @@ def appointments_upcoming():
 def health_metrics_list():
     uid = g.user.id
     if request.method == 'GET':
-        records = health_metrics_db.filter(patient=uid)
+        records = health_metrics_db.filter(user=uid)
         records.sort(key=lambda r: r.get('recorded_at', ''), reverse=True)
         return jsonify(records)
 
     data = request.get_json(silent=True) or {}
-    data['patient'] = uid
+    data['user'] = uid
     if 'recorded_at' not in data:
         data['recorded_at'] = datetime.now().isoformat()
     record = health_metrics_db.create(data)
@@ -378,7 +378,7 @@ def health_metrics_detail(pk):
         return jsonify(record)
     if request.method == 'PUT':
         data = request.get_json(silent=True) or {}
-        allowed = ['metric_type', 'value', 'unit', 'notes']
+        allowed = ['metric_type', 'value', 'unit', 'notes', 'recorded_at']
         updates = {k: v for k, v in data.items() if k in allowed}
         record = health_metrics_db.update(pk, updates)
         return jsonify(record)
@@ -396,7 +396,7 @@ def health_metrics_trends():
     start = (datetime.now() - timedelta(days=days)).isoformat()
 
     records = health_metrics_db.filter_fn(
-        lambda r: r.get('patient') == uid and r.get('recorded_at', '') >= start
+        lambda r: r.get('user') == uid and r.get('recorded_at', '') >= start
     )
     if metric_type:
         records = [r for r in records if r.get('metric_type') == metric_type]
@@ -539,10 +539,10 @@ def ai_consultations_list():
 def emergency_contacts_list():
     uid = g.user.id
     if request.method == 'GET':
-        return jsonify(emergency_contacts_db.filter(patient=uid))
+        return jsonify(emergency_contacts_db.filter(user=uid))
 
     data = request.get_json(silent=True) or {}
-    data['patient'] = uid
+    data['user'] = uid
     record = emergency_contacts_db.create(data)
     return jsonify(record), 201
 
@@ -628,20 +628,28 @@ def dashboard_stats():
         r.get('status') in ('scheduled', 'confirmed')
     )
 
+    # Handle prescriptions with missing or empty valid_until (treat as ongoing)
     active_prescriptions = prescriptions_db.filter_fn(
-        lambda r: r.get('patient') == uid and
-        r.get('valid_until', '') >= today
+        lambda r: r.get('patient') == uid and (
+            not r.get('valid_until') or 
+            r.get('valid_until') == '' or 
+            r.get('valid_until', '') >= today
+        )
     )
 
+    # Handle reminders with missing or empty end_date (treat as ongoing)
     active_reminders = medicine_reminders_db.filter_fn(
-        lambda r: r.get('patient') == uid and
-        r.get('is_active') is True and
-        r.get('end_date', '') >= today
+        lambda r: r.get('user') == uid and
+        r.get('is_active') is True and (
+            not r.get('end_date') or 
+            r.get('end_date') == '' or 
+            r.get('end_date', '') >= today
+        )
     )
 
     total_consultations = ai_consultations_db.count(patient=uid)
 
-    metrics = health_metrics_db.filter(patient=uid)
+    metrics = health_metrics_db.filter(user=uid)
     metrics.sort(key=lambda r: r.get('recorded_at', ''), reverse=True)
     recent_metrics = metrics[:5]
 

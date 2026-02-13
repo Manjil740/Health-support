@@ -107,6 +107,10 @@ def verify_otp(email: str, otp: str) -> dict:
     
     record = records[0]
     
+    # Check if expires_at exists
+    if 'expires_at' not in record:
+        return {'valid': False, 'error': 'Invalid OTP record'}
+    
     # Check if expired
     expires_at = datetime.fromisoformat(record['expires_at'])
     if datetime.utcnow() > expires_at:
@@ -133,6 +137,9 @@ def is_email_verified(email: str) -> bool:
     records = otp_db.filter(email=email, verified=True)
     if records:
         record = records[0]
+        # Check if expires_at exists
+        if 'expires_at' not in record:
+            return False
         expires_at = datetime.fromisoformat(record['expires_at'])
         # Verified status is valid for 24 hours
         if datetime.utcnow() <= expires_at + timedelta(hours=24):
@@ -145,6 +152,10 @@ def clean_expired_otps():
     all_otps = otp_db.get_all()
     for record in all_otps:
         try:
+            # Check if expires_at exists
+            if 'expires_at' not in record:
+                otp_db.delete(record['id'])
+                continue
             expires_at = datetime.fromisoformat(record['expires_at'])
             if datetime.utcnow() > expires_at + timedelta(hours=1):
                 otp_db.delete(record['id'])

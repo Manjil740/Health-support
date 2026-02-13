@@ -14,11 +14,8 @@ from flask import Blueprint, request, jsonify, g
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from api.json_db import users_db, user_profiles_db, clinics_db, JsonCollection
+from api.json_db import users_db, user_profiles_db, clinics_db, JsonCollection, hash_password, verify_password
 from subscription_service import create_subscription
-
-# Temporary storage for pending registrations
-registrations_db = JsonCollection('pending_registrations')
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +160,19 @@ def register():
         blood_group = data.get('blood_group', '')
         first_name = data.get('first_name', '').strip() or email.split('@')[0]
         last_name = data.get('last_name', '')
+        
+        # Handle date_of_birth - can be passed directly or calculated from age
         date_of_birth = data.get('date_of_birth')
+        if not date_of_birth and age:
+            # Calculate date_of_birth from age (assume January 1st of birth year)
+            try:
+                age_num = int(age)
+                if age_num >= 18:
+                    current_year = datetime.datetime.now().year
+                    birth_year = current_year - age_num
+                    date_of_birth = f"{birth_year}-01-01"
+            except (ValueError, TypeError):
+                pass
         
         # Validation
         errors = {}
@@ -173,7 +182,7 @@ def register():
             errors['phone'] = 'Phone number is required.'
         if not password or len(password) < 6:
             errors['password'] = 'Password must be at least 6 characters.'
-        if age < 18:
+        if age and int(age) < 18:
             errors['age'] = 'You must be at least 18 years old.'
         
         if errors:
@@ -188,7 +197,7 @@ def register():
         user = users_db.create({
             'username': email.split('@')[0] + str(users_db.count() + 1),
             'email': email,
-            'password': users_db.hash_password(password) if hasattr(users_db, 'hash_password') else hash_password(password),
+            'password': hash_password(password),
             'first_name': first_name,
             'last_name': last_name,
             'is_active': True,
@@ -286,7 +295,7 @@ def register_clinic():
         admin_user = users_db.create({
             'username': clinic_name.lower().replace(' ', '_') + '_admin',
             'email': clinic_email,
-            'password': users_db.hash_password(admin_password) if hasattr(users_db, 'hash_password') else hash_password(admin_password),
+            'password': hash_password(admin_password),
             'first_name': 'Clinic',
             'last_name': 'Admin',
             'is_active': True,
@@ -358,13 +367,9 @@ def login():
                 'detail': 'Invalid credentials.'
             }), 401
 
-        # Verify password (use hash_password from json_db)
+        # Verify password
         stored_password = user.get('password', '')
-        password_valid = False
-        if hasattr(users_db, 'verify_password'):
-            password_valid = users_db.verify_password(password, stored_password)
-        else:
-            password_valid = verify_password(password, stored_password)
+        password_valid = verify_password(password, stored_password)
         
         if not password_valid:
             record_attempt(username)
@@ -439,22 +444,6 @@ def me():
         }), 500
 
 
-# ── Password Hashing Helpers ─────────────────────
-
-def hash_password(password: str) -> str:
-    """Hash a password using SHA256 with salt"""
-    import hashlib
-    salt = secrets.token_hex(16)
-    hashed = hashlib.sha256(f'{salt}{password}'.encode()).hexdigest()
-    return f'{salt}${hashed}'
-
-
-def verify_password(password: str, stored_hash: str) -> bool:
-    """Verify a password against its hash"""
-    import hashlib
-    try:
-        salt, hashed = stored_hash.split('$', 1)
-        return hashlib.sha256(f'{salt}{password}'.encode()).hexdigest() == hashed
-    except (ValueError, AttributeError):
-        return False
+# ── Import password helpers from json_db ─────────────────────
+# Password functions are now imported from api.json_db to avoid duplication
 

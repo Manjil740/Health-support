@@ -125,6 +125,15 @@ def check_subscription_status(clinic_id: int) -> dict:
         }
     
     subscription = subscriptions[0]  # Get latest
+    
+    # Handle missing end_date
+    if 'end_date' not in subscription:
+        return {
+            'has_subscription': False,
+            'status': 'invalid',
+            'message': 'Subscription has no end date'
+        }
+    
     end_date = datetime.fromisoformat(subscription['end_date'])
     
     if subscription['status'] != 'active':
@@ -160,6 +169,15 @@ def get_subscription_details(subscription_id: int) -> dict:
     subscription = subscriptions_db.get(subscription_id)
     if not subscription:
         return {'error': 'Subscription not found'}
+    
+    # Handle missing end_date
+    if 'end_date' not in subscription:
+        return {
+            **subscription,
+            'days_remaining': 0,
+            'is_active': False,
+            'error': 'Subscription has no end date'
+        }
     
     end_date = datetime.fromisoformat(subscription['end_date'])
     days_remaining = (end_date - datetime.utcnow()).days
